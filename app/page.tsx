@@ -239,13 +239,7 @@ return () => { authListener.subscription.unsubscribe(); };
     setShowAddFriendModal(false);
     alert(`${target} arkadaş olarak eklendi!`);
   };
-
-  const getLastSeen = (uName: string) => {
-    const userLog = logs.find(l => l.user_name === uName);
-    if (!userLog) return "Bilinmiyor";
-    return new Date(userLog.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-  };
-
+  
   const handleCardClick = async (file: ArchiveItem) => {
     await supabase.from("logs").insert([{ title: file.title, image_url: file.image_url, user_name: currentUserName, file_id: file.id }]);
     fetchAllData();
