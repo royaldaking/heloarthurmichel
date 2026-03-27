@@ -1,8 +1,9 @@
 "use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { 
-  Plus, Trash2, X, Dices, Activity, Menu, ChevronLeft, ChevronUp, ChevronDown, 
+  Plus, Trash2, X, Activity, Menu, ChevronLeft, ChevronUp, ChevronDown, 
   LogOut, Lock, Mail, Tag, BarChart3, ShieldAlert, Edit3, ExternalLink, User, 
   Image as ImageIcon, MessageCircle, UserPlus, Send, Search, Clock, Settings, 
   Palette, Paintbrush, Link2, Eye
@@ -16,7 +17,22 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 interface Category { id: string; name: string; }
 interface ArchiveItem { id: number; title: string; mega_url: string; image_url: string; category: string; order_index: number; }
 interface LogEntry { id: number; created_at: string; title: string; image_url: string; user_name?: string; file_id?: number | null; }
-interface Message { id?: number; created_at?: string; sender_name: string; receiver_name: string; text: string; }
+interface Message { 
+  id?: number; 
+  created_at?: string; 
+  sender_name: string; 
+  receiver_name: string; 
+  text: string; 
+  is_deleted?: boolean;
+  image_url?: string;
+  file_url?: string;
+  file_name?: string;
+}
+interface ChatBackgroundSettings {
+  imageUrl: string;
+  blur: number;
+  opacity: number;
+}
 interface BackgroundSettings {
   type: 'solid' | 'gradient' | 'image';
   solidColor: string;
@@ -47,9 +63,22 @@ export default function EmreBoard() {
   const [activeChatFriend, setActiveChatFriend] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [showAddFriendModal, setShowAddFriendModal] = useState(false);
+const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [searchFriendName, setSearchFriendName] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const [showFriendsPanel, setShowFriendsPanel] = useState(true);
+  
+  // Chat background settings
+  const [chatBackgroundSettings, setChatBackgroundSettings] = useState<ChatBackgroundSettings>({
+    imageUrl: '',
+    blur: 0,
+    opacity: 30
+  });
+  
+  // Chat file upload
+  const [chatFile, setChatFile] = useState<File | null>(null);
+  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -117,6 +146,9 @@ const savedFriends = localStorage.getItem("emre_board_friends");
 
     const savedBgSettings = localStorage.getItem("emre_board_bg_settings");
     if (savedBgSettings) setBackgroundSettings(JSON.parse(savedBgSettings));
+    
+    const savedChatBgSettings = localStorage.getItem("emre_board_chat_bg_settings");
+    if (savedChatBgSettings) setChatBackgroundSettings(JSON.parse(savedChatBgSettings));
 
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidebarOpen(false);
@@ -198,24 +230,154 @@ return () => { authListener.subscription.unsubscribe(); };
     if (logData) setLogs(logData as LogEntry[]);
   }
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeChatFriend) return;
+    if ((!newMessage.trim() && !chatFile) || !activeChatFriend) return;
+
+    let imageUrl = '';
+    let fileUrl = '';
+    let fileName = '';
+
+    // Dosya/Resim yukleme
+    if (chatFile) {
+      const uploadFileName = `chat-${Date.now()}-${chatFile.name.replace(/\s/g, '-')}`;
+      const { error: uploadError } = await supabase.storage.from("arsiv-dosyalari").upload(uploadFileName, chatFile);
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(uploadFileName);
+        if (chatFile.type.startsWith('image/')) {
+          imageUrl = urlData.publicUrl;
+        } else {
+          fileUrl = urlData.publicUrl;
+          fileName = chatFile.name;
+        }
+      }
+    }
 
     const { error } = await supabase.from("messages").insert([
       { 
         sender_name: currentUserName, 
         receiver_name: activeChatFriend, 
-        text: newMessage.trim() 
+        text: newMessage.trim(),
+        image_url: imageUrl || null,
+        file_url: fileUrl || null,
+        file_name: fileName || null
       }
     ]);
 
     if (error) {
-        console.error("Mesaj Hatası:", error);
-        alert("Mesaj gönderilemedi. Lütfen veri tabanında 'sender_name', 'receiver_name' ve 'text' sütunlarının olduğundan emin ol.");
+        console.error("Mesaj Hatasi:", error);
+        alert("Mesaj gonderilemedi. Lutfen veri tabaninda 'sender_name', 'receiver_name' ve 'text' sutunlarinin oldugunu kontrol edin.");
     } else {
         setNewMessage("");
+        setChatFile(null);
+        setChatImagePreview(null);
     }
+  };
+
+  // CTRL+V ile chat arka plan resmi yapistirma
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (!showChatPanel) return;
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            // Eger sohbet arka plani ayarlari aciksa, arka plan olarak ayarla
+            const settingsOpen = document.querySelector('[data-chat-settings]');
+            if (settingsOpen) {
+              // Arka plan icin upload
+              const fileName = `chat-bg-${Date.now()}-${file.name || 'pasted.png'}`;
+              const { error } = await supabase.storage.from("arsiv-dosyalari").upload(fileName, file);
+              if (!error) {
+                const { data: urlData } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fileName);
+                const newSettings = { ...chatBackgroundSettings, imageUrl: urlData.publicUrl };
+                setChatBackgroundSettings(newSettings);
+                localStorage.setItem("emre_board_chat_bg_settings", JSON.stringify(newSettings));
+              }
+            } else {
+              // Normal mesaj icin resim yapistir
+              setChatFile(file);
+              setChatImagePreview(URL.createObjectURL(file));
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [showChatPanel, chatBackgroundSettings]);
+
+  // Mesaj silme fonksiyonu (is_deleted flag)
+  const handleDeleteMessage = async (msgId: number, senderName: string) => {
+    if (senderName !== currentUserName && !isAdmin) {
+      alert("Sadece kendi mesajlarinizi silebilirsiniz!");
+      return;
+    }
+    if (!confirm("Bu mesaji silmek istediginize emin misiniz?")) return;
+    
+    const { error } = await supabase.from("messages").update({ is_deleted: true }).eq("id", msgId);
+    if (!error) {
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_deleted: true } : m));
+    }
+  };
+
+  // Sohbeti temizle (Admin)
+  const handleClearChat = async () => {
+    if (!isAdmin || !activeChatFriend) return;
+    if (!confirm(`${activeChatFriend} ile tum sohbeti temizlemek istediginize emin misiniz?`)) return;
+    
+    const { error } = await supabase
+      .from("messages")
+      .update({ is_deleted: true })
+      .or(`and(sender_name.eq.${currentUserName},receiver_name.eq.${activeChatFriend}),and(sender_name.eq.${activeChatFriend},receiver_name.eq.${currentUserName})`);
+    
+    if (!error) {
+      setMessages(prev => prev.map(m => ({ ...m, is_deleted: true })));
+    }
+  };
+
+  // Kullanici silme (Admin)
+  const handleDeleteUser = async (userName: string) => {
+    if (!isAdmin) return;
+    if (!confirm(`${userName} kullanicisinin tum verilerini silmek istediginize emin misiniz? Bu islem geri alinamaz!`)) return;
+    
+    // Kullanicinin loglarini sil
+    await supabase.from("logs").delete().eq("user_name", userName);
+    // Kullanicinin mesajlarini sil
+    await supabase.from("messages").delete().or(`sender_name.eq.${userName},receiver_name.eq.${userName}`);
+    
+    fetchAllData();
+    alert(`${userName} kullanicisi silindi.`);
+  };
+
+  // Profil resmi yukleme (profiles bucket)
+  const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    try {
+      const fileName = `profile-${currentUserName}-${Date.now()}.${file.name.split('.').pop()}`;
+      await supabase.storage.from("profiles").upload(fileName, file);
+      const { data: urlData } = supabase.storage.from("profiles").getPublicUrl(fileName);
+      const newProfiles = { ...userProfiles, [currentUserName]: urlData.publicUrl };
+      setUserProfiles(newProfiles);
+      localStorage.setItem("emre_board_profiles", JSON.stringify(newProfiles));
+    } catch (err: any) { 
+      // profiles bucket yoksa arsiv-dosyalari kullan
+      try {
+        const fileName = `profile-${currentUserName}-${Date.now()}.${file.name.split('.').pop()}`;
+        await supabase.storage.from("arsiv-dosyalari").upload(fileName, file);
+        const { data: urlData } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fileName);
+        const newProfiles = { ...userProfiles, [currentUserName]: urlData.publicUrl };
+        setUserProfiles(newProfiles);
+        localStorage.setItem("emre_board_profiles", JSON.stringify(newProfiles));
+      } catch (e: any) { alert(e.message); }
+    } finally { setLoading(false); }
   };
 
   const handleAddFriend = async () => {
@@ -238,12 +400,6 @@ return () => { authListener.subscription.unsubscribe(); };
     setSearchFriendName("");
     setShowAddFriendModal(false);
     alert(`${target} arkadaş olarak eklendi!`);
-  };
-
-  const getLastSeen = (uName: string) => {
-    const userLog = logs.find(l => l.user_name === uName);
-    if (!userLog) return "Bilinmiyor";
-    return new Date(userLog.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
   };
 
   const handleCardClick = async (file: ArchiveItem) => {
@@ -598,14 +754,30 @@ const handleAuth = async (e: React.FormEvent) => {
               </div>
             </div>
 
-            <div className="mt-6 space-y-3 pt-4 border-t border-white/5">
+<div className="mt-6 space-y-3 pt-4 border-t border-white/5">
                 <button onClick={handleAddCategory} className="w-full flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5 uppercase text-[10px] font-black hover:bg-blue-600/10"><Plus size={18} /> Liste Ekle</button>
                 <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-3">
                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-black italic text-[10px]">{currentUserName[0]}</div>
-                      <p className="text-[10px] font-black uppercase italic truncate">{currentUserName}</p>
+                      {/* Profil resmi yukleme */}
+                      <label className="relative cursor-pointer group">
+                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-black italic text-[10px] overflow-hidden">
+                          {userProfiles[currentUserName] ? (
+                            <img src={userProfiles[currentUserName]} alt="Profil" className="w-full h-full object-cover" />
+                          ) : (
+                            currentUserName[0]
+                          )}
+                        </div>
+                        <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                          <ImageIcon size={14} className="text-white" />
+                        </div>
+                        <input type="file" accept="image/*" className="hidden" onChange={handleProfileUpload} />
+                      </label>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-black uppercase italic truncate">{currentUserName}</p>
+                        <p className="text-[8px] text-zinc-500">Profil icin tikla</p>
+                      </div>
                    </div>
-                   <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-3 p-3 bg-red-600/10 text-red-500 rounded-xl font-black uppercase italic text-[10px]"><LogOut size={16} /> Çıkış</button>
+                   <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-3 p-3 bg-red-600/10 text-red-500 rounded-xl font-black uppercase italic text-[10px]"><LogOut size={16} /> Cikis</button>
                 </div>
             </div>
         </div>
@@ -716,6 +888,16 @@ const handleAuth = async (e: React.FormEvent) => {
                   <div key={uName} className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 aspect-[4/3] flex flex-col items-center justify-center transition-all hover:border-blue-600/50 shadow-2xl">
                     {userProfiles[uName] && <img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt="" />}
                     <label className="absolute top-4 right-4 p-2 bg-black/60 rounded-xl text-blue-500 opacity-0 group-hover:opacity-100 cursor-pointer z-20"><ImageIcon size={16} /><input type="file" accept="image/*" className="hidden" onChange={(e) => handleUserPhotoUpload(uName, e)} /></label>
+                    {/* Admin: Kullanici Silme */}
+                    {isAdmin && uName !== ADMIN_NAME && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteUser(uName); }} 
+                        className="absolute bottom-4 right-4 p-2 bg-red-600/80 rounded-xl text-white opacity-0 group-hover:opacity-100 z-20 hover:bg-red-600"
+                        title="Kullaniciyi Sil"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                     {/* Online Status */}
                     <div className={`absolute top-4 left-4 px-2 py-1 rounded-full text-[8px] font-black uppercase ${isUserOnline(uName) ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
                       {isUserOnline(uName) ? 'Cevrimici' : 'Cevrimdisi'}
@@ -745,20 +927,26 @@ const handleAuth = async (e: React.FormEvent) => {
         </div>
       )}
 
-      {showChatPanel && (
+{showChatPanel && (
         <div className="fixed inset-0 z-[700] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-6xl h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-row shadow-4xl relative">
-            {/* Sol: Arkadaşlar */}
+            {/* Sol: Arkadaslar Panel */}
+            {showFriendsPanel && (
             <div className="w-80 border-r border-white/5 flex flex-col bg-zinc-900/30">
               <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                <h3 className="font-black uppercase italic text-sm text-blue-500">Arkadaşlar</h3>
-                <button onClick={() => setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 transition-all"><UserPlus size={18}/></button>
+                <h3 className="font-black uppercase italic text-sm text-blue-500">Arkadaslar</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 transition-all"><UserPlus size={18}/></button>
+                  <button onClick={() => setShowFriendsPanel(false)} className="p-2 bg-red-600/20 text-red-500 rounded-lg hover:bg-red-600 transition-all"><X size={18}/></button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
 {/* Admin Sabit */}
                  <div onClick={() => setActiveChatFriend(ADMIN_NAME)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === ADMIN_NAME ? 'bg-blue-600 border-blue-400 shadow-lg' : 'bg-blue-600/10 border-blue-600/20'}`}>
                     <div className="relative">
-                      <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center font-black">E</div>
+                      <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center font-black overflow-hidden">
+                        {userProfiles[ADMIN_NAME] ? <img src={userProfiles[ADMIN_NAME]} alt="" className="w-full h-full object-cover" /> : 'E'}
+                      </div>
                       <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(ADMIN_NAME) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
                     </div>
                     <div className="flex-1">
@@ -769,11 +957,13 @@ const handleAuth = async (e: React.FormEvent) => {
                         </p>
                     </div>
                  </div>
-                 {/* Ekli Arkadaşlar */}
+                 {/* Ekli Arkadaslar */}
                  {friends.map((fName, i) => (
                     <div key={i} onClick={() => setActiveChatFriend(fName)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === fName ? 'bg-zinc-700 border-zinc-500 shadow-lg' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
                        <div className="relative">
-                         <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center font-black italic">{fName[0].toUpperCase()}</div>
+                         <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center font-black italic overflow-hidden">
+                           {userProfiles[fName] ? <img src={userProfiles[fName]} alt="" className="w-full h-full object-cover" /> : fName[0].toUpperCase()}
+                         </div>
                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(fName) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
                        </div>
                        <div className="flex-1">
@@ -787,60 +977,159 @@ const handleAuth = async (e: React.FormEvent) => {
                  ))}
               </div>
             </div>
+            )}
 
-            {/* Sağ: Mesajlaşma */}
-            <div className="flex-1 flex flex-col relative bg-black/20">
+            {/* Sag: Mesajlasma */}
+            <div className="flex-1 flex flex-col relative">
+               {/* Chat Background */}
+               {chatBackgroundSettings.imageUrl && (
+                 <>
+                   <div className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${chatBackgroundSettings.imageUrl})`, filter: `blur(${chatBackgroundSettings.blur}px)`, transform: 'scale(1.1)' }} />
+                   <div className="absolute inset-0 z-0" style={{ backgroundColor: `rgba(0,0,0,${chatBackgroundSettings.opacity / 100})` }} />
+                 </>
+               )}
+               
                {activeChatFriend ? (
                    <>
-                       <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                       <div className="p-6 border-b border-white/5 flex items-center justify-between relative z-10 bg-black/50 backdrop-blur-md">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center font-black">{activeChatFriend[0].toUpperCase()}</div>
+                            {!showFriendsPanel && (
+                              <button onClick={() => setShowFriendsPanel(true)} className="p-2 bg-white/10 rounded-lg mr-2"><Menu size={18}/></button>
+                            )}
+                            <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center font-black overflow-hidden">
+                              {userProfiles[activeChatFriend] ? <img src={userProfiles[activeChatFriend]} alt="" className="w-full h-full object-cover" /> : activeChatFriend[0].toUpperCase()}
+                            </div>
                             <div>
                               <h4 className="font-black uppercase italic">{activeChatFriend}</h4>
-                              <button onClick={() => { setSelectedUser(activeChatFriend); setShowActivityPanel(true); }} className="text-[9px] font-black text-blue-500 hover:underline">AKTİVİTEYİ GÖR</button>
+                              <button onClick={() => { setSelectedUser(activeChatFriend); setShowActivityPanel(true); }} className="text-[9px] font-black text-blue-500 hover:underline">AKTIVITEYI GOR</button>
                             </div>
                           </div>
-                          <button onClick={() => setShowChatPanel(false)} className="p-2 text-zinc-500 hover:text-white"><X/></button>
+                          <div className="flex items-center gap-2">
+                            {/* Chat Settings Button */}
+                            <button data-chat-settings onClick={() => {
+                              const url = prompt("Sohbet arka plan URL (CTRL+V ile de yapistirabilirsin):", chatBackgroundSettings.imageUrl);
+                              if (url !== null) {
+                                const newSettings = { ...chatBackgroundSettings, imageUrl: url };
+                                setChatBackgroundSettings(newSettings);
+                                localStorage.setItem("emre_board_chat_bg_settings", JSON.stringify(newSettings));
+                              }
+                            }} className="p-2 bg-purple-600/20 text-purple-500 rounded-xl hover:bg-purple-600 transition-all"><Palette size={18}/></button>
+                            {/* Admin: Clear Chat */}
+                            {isAdmin && (
+                              <button onClick={handleClearChat} className="p-2 bg-orange-600/20 text-orange-500 rounded-xl hover:bg-orange-600 transition-all" title="Sohbeti Temizle"><Trash2 size={18}/></button>
+                            )}
+                            <button onClick={() => setShowChatPanel(false)} className="p-2 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600 transition-all"><X size={18}/></button>
+                          </div>
                        </div>
                        
-                       <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar-v">
-                          {messages.map((msg, i) => {
+                       <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar-v relative z-10">
+                          {messages.filter(m => !m.is_deleted).map((msg, i) => {
                             const isMe = msg.sender_name === currentUserName;
+                            const senderAvatar = userProfiles[msg.sender_name];
                             return (
-                              <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[70%] p-4 rounded-2xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-zinc-800 text-zinc-200 rounded-tl-none'}`}>
-                                  <p className="text-sm font-medium">{msg.text}</p>
+                              <div key={i} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                {/* Avatar (sol taraf - karsi taraf icin) */}
+                                {!isMe && (
+                                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center font-black text-xs overflow-hidden shrink-0">
+                                    {senderAvatar ? <img src={senderAvatar} alt="" className="w-full h-full object-cover" /> : msg.sender_name[0].toUpperCase()}
+                                  </div>
+                                )}
+                                <div className={`max-w-[70%] p-4 rounded-2xl relative group ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-zinc-800/90 backdrop-blur-sm text-zinc-200 rounded-tl-none'}`}>
+                                  {/* Mesaj icerigi */}
+                                  {msg.image_url && (
+                                    <img src={msg.image_url} alt="Gonderilen resim" className="max-w-full rounded-xl mb-2 cursor-pointer" onClick={() => window.open(msg.image_url, '_blank')} />
+                                  )}
+                                  {msg.file_url && (
+                                    <a href={msg.file_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-black/20 rounded-lg mb-2 text-xs hover:bg-black/40">
+                                      <Link2 size={14} /> {msg.file_name || 'Dosya'}
+                                    </a>
+                                  )}
+                                  {msg.text && <p className="text-sm font-medium">{msg.text}</p>}
                                   <p className="text-[8px] text-white/30 text-right mt-1">{msg.created_at ? new Date(msg.created_at).toLocaleTimeString() : ""}</p>
+                                  
+                                  {/* Silme butonu */}
+                                  {(isMe || isAdmin) && msg.id && (
+                                    <button 
+                                      onClick={() => handleDeleteMessage(msg.id!, msg.sender_name)} 
+                                      className="absolute -top-2 -right-2 p-1.5 bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  )}
                                 </div>
+                                {/* Avatar (sag taraf - kendim icin) */}
+                                {isMe && (
+                                  <div className="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center font-black text-xs overflow-hidden shrink-0">
+                                    {userProfiles[currentUserName] ? <img src={userProfiles[currentUserName]} alt="" className="w-full h-full object-cover" /> : currentUserName[0].toUpperCase()}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
                           <div ref={chatEndRef} />
                        </div>
 
-                       <form onSubmit={handleSendMessage} className="p-6 border-t border-white/5 flex gap-4 bg-zinc-900/30">
-                          <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={`${activeChatFriend} kişisine mesaj yaz...`} className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:border-blue-600" />
+                       {/* Image/File Preview */}
+                       {chatImagePreview && (
+                         <div className="p-4 border-t border-white/5 bg-zinc-900/50 relative z-10">
+                           <div className="flex items-center gap-4">
+                             <img src={chatImagePreview} alt="Onizleme" className="h-16 rounded-lg" />
+                             <button onClick={() => { setChatFile(null); setChatImagePreview(null); }} className="p-2 bg-red-600/20 text-red-500 rounded-lg"><X size={16}/></button>
+                           </div>
+                         </div>
+                       )}
+
+                       <form onSubmit={handleSendMessage} className="p-6 border-t border-white/5 flex gap-4 bg-zinc-900/80 backdrop-blur-md relative z-10">
+                          {/* Dosya yukleme butonu */}
+                          <label className="p-4 bg-white/10 rounded-2xl cursor-pointer hover:bg-white/20 transition-all">
+                            <ImageIcon size={18} />
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*,application/pdf,.doc,.docx,.txt"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setChatFile(file);
+                                  if (file.type.startsWith('image/')) {
+                                    setChatImagePreview(URL.createObjectURL(file));
+                                  }
+                                }
+                              }}
+                            />
+                          </label>
+                          <input 
+                            ref={chatInputRef}
+                            type="text" 
+                            value={newMessage} 
+                            onChange={(e) => setNewMessage(e.target.value)} 
+                            placeholder={`${activeChatFriend} kisisine mesaj yaz... (CTRL+V ile resim yapistir)`} 
+                            className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:border-blue-600" 
+                          />
                           <button type="submit" className="p-4 bg-blue-600 rounded-2xl hover:bg-blue-500 transition-all"><Send size={18}/></button>
                        </form>
                    </>
                ) : (
-                   <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 uppercase italic font-black">
+                   <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 uppercase italic font-black relative z-10">
+                       {!showFriendsPanel && (
+                         <button onClick={() => setShowFriendsPanel(true)} className="p-4 bg-white/10 rounded-2xl mb-4"><Menu size={24}/></button>
+                       )}
                        <MessageCircle size={64} className="mb-4 opacity-20"/>
-                       <p>Mesajlaşmak için bir arkadaş seç</p>
+                       <p>Mesajlasmak icin bir arkadas sec</p>
                    </div>
                )}
             </div>
 
-            {/* Arkadaş Ekleme Modalı */}
+            {/* Arkadas Ekleme Modali */}
             {showAddFriendModal && (
               <div className="absolute inset-0 z-[800] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
                 <div className="w-full max-w-sm bg-zinc-900 border border-white/10 p-8 rounded-[2rem] shadow-4xl text-center">
-                  <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadaş Ara</h3>
-                  <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTİF KULLANICILAR EKLENEBİLİR</p>
-                  <input type="text" value={searchFriendName} onChange={(e) => setSearchFriendName(e.target.value)} placeholder="Tam kullanıcı adı..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6" />
+                  <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadas Ara</h3>
+                  <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTIF KULLANICILAR EKLENEBILIR</p>
+                  <input type="text" value={searchFriendName} onChange={(e) => setSearchFriendName(e.target.value)} placeholder="Tam kullanici adi..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6" />
                   <div className="flex gap-4">
-                    <button onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
-                    <button onClick={handleAddFriend} className="flex-1 p-3 bg-blue-600 rounded-xl text-[10px] font-black uppercase">Ekle</button>
+                    <button type="button" onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">Iptal</button>
+                    <button type="button" onClick={handleAddFriend} className="flex-1 p-3 bg-blue-600 rounded-xl text-[10px] font-black uppercase">Ekle</button>
                   </div>
                 </div>
               </div>
