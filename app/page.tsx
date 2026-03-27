@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { 
-  Plus, Trash2, X, Activity, Menu, ChevronLeft, ChevronUp, ChevronDown, 
+  Plus, Trash2, X, Activity, Menu, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, 
   LogOut, Lock, Mail, Tag, BarChart3, ShieldAlert, Edit3, ExternalLink, User, 
   Image as ImageIcon, MessageCircle, UserPlus, Send, Search, Clock, Settings, 
-  Palette, Paintbrush, Link2, Eye
+  Palette, Paintbrush, Link2, Eye, Upload, MoreVertical
 } from "lucide-react";
 
 // --- KONFİGÜRASYON ---
@@ -112,6 +112,8 @@ const [isAdmin, setIsAdmin] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [searchedUserData, setSearchedUserData] = useState<{user: string; files: ArchiveItem[]; logs: LogEntry[]} | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<{[key: string]: {online: boolean; last_seen: string}}>({});
+  const [activeConversations, setActiveConversations] = useState<string[]>([]);
+  const [cardTransferMenu, setCardTransferMenu] = useState<{fileId: number; x: number; y: number} | null>(null);
   const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
     type: 'solid',
     solidColor: '#050505',
@@ -149,6 +151,9 @@ const savedFriends = localStorage.getItem("emre_board_friends");
     
     const savedChatBgSettings = localStorage.getItem("emre_board_chat_bg_settings");
     if (savedChatBgSettings) setChatBackgroundSettings(JSON.parse(savedChatBgSettings));
+    
+    const savedConversations = localStorage.getItem("emre_board_conversations");
+    if (savedConversations) setActiveConversations(JSON.parse(savedConversations));
 
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidebarOpen(false);
@@ -271,6 +276,13 @@ const handleSendMessage = async (e: React.FormEvent) => {
         setNewMessage("");
         setChatFile(null);
         setChatImagePreview(null);
+        
+        // Otomatik sohbet baslatma - alici tarafa sohbet ekle
+        if (!activeConversations.includes(activeChatFriend)) {
+          const newConversations = [...activeConversations, activeChatFriend];
+          setActiveConversations(newConversations);
+          localStorage.setItem("emre_board_conversations", JSON.stringify(newConversations));
+        }
     }
   };
 
@@ -378,6 +390,64 @@ const handleSendMessage = async (e: React.FormEvent) => {
         localStorage.setItem("emre_board_profiles", JSON.stringify(newProfiles));
       } catch (e: any) { alert(e.message); }
     } finally { setLoading(false); }
+  };
+
+  // Liste sirasi degistirme (manuel sol/sag)
+  const moveCategoryOrder = async (catIndex: number, direction: 'left' | 'right') => {
+    const newCategories = [...categories];
+    const targetIndex = direction === 'left' ? catIndex - 1 : catIndex + 1;
+    if (targetIndex < 0 || targetIndex >= newCategories.length) return;
+    
+    // Swap
+    [newCategories[catIndex], newCategories[targetIndex]] = [newCategories[targetIndex], newCategories[catIndex]];
+    setCategories(newCategories);
+    
+    // Veritabaninda id'leri guncelle (basit yontem - local state tutarak)
+    localStorage.setItem("emre_board_cat_order", JSON.stringify(newCategories.map(c => c.id)));
+  };
+
+  // Karti baska listeye tasima
+  const transferCardToCategory = async (fileId: number, newCategoryId: string) => {
+    const { error } = await supabase.from("arsiv").update({ category: newCategoryId }).eq("id", fileId);
+    if (!error) {
+      fetchAllData();
+      setCardTransferMenu(null);
+    }
+  };
+
+  // Arkadas silme + mesaj gecmisi temizleme
+  const handleRemoveFriend = async (friendName: string) => {
+    if (!confirm(`${friendName} arkadasinizi silmek istediginize emin misiniz? Mesaj gecmisi de silinecek.`)) return;
+    
+    // Mesajlari sil (local)
+    const newFriends = friends.filter(f => f !== friendName);
+    setFriends(newFriends);
+    localStorage.setItem("emre_board_friends", JSON.stringify(newFriends));
+    
+    // Aktif sohbetten kaldir
+    const newConversations = activeConversations.filter(c => c !== friendName);
+    setActiveConversations(newConversations);
+    localStorage.setItem("emre_board_conversations", JSON.stringify(newConversations));
+    
+    if (activeChatFriend === friendName) {
+      setActiveChatFriend(null);
+      setMessages([]);
+    }
+  };
+
+  // Sohbet arka plani dosya yukleme
+  const handleChatBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const fileName = `chat-bg-${Date.now()}-${file.name.replace(/\s/g, '-')}`;
+    const { error } = await supabase.storage.from("arsiv-dosyalari").upload(fileName, file);
+    if (!error) {
+      const { data: urlData } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fileName);
+      const newSettings = { ...chatBackgroundSettings, imageUrl: urlData.publicUrl };
+      setChatBackgroundSettings(newSettings);
+      localStorage.setItem("emre_board_chat_bg_settings", JSON.stringify(newSettings));
+    }
   };
 
   const handleAddFriend = async () => {
@@ -726,11 +796,9 @@ const handleAuth = async (e: React.FormEvent) => {
               <button onClick={() => setIsSidebarOpen(false)} className="text-zinc-500"><ChevronLeft/></button>
             </div>
 
-            <div className="space-y-3 mb-8">
-              <button onClick={() => { fetchAllData(); setShowActivityPanel(true); }} className="w-full flex items-center gap-3 p-3 bg-green-600/10 text-green-500 rounded-xl border border-green-600/20 font-black uppercase italic text-[10px]"><Activity size={18} /> Aktivite</button>
-<button onClick={() => setShowChatPanel(true)} className="w-full flex items-center gap-3 p-3 bg-purple-600/10 text-purple-500 rounded-xl border border-purple-600/20 font-black uppercase italic text-[10px]"><MessageCircle size={18} /> Sohbet & Arkadaşlar</button>
+<div className="space-y-3 mb-8">
+              <button onClick={() => setShowChatPanel(true)} className="w-full flex items-center gap-3 p-3 bg-purple-600/10 text-purple-500 rounded-xl border border-purple-600/20 font-black uppercase italic text-[10px]"><MessageCircle size={18} /> Sohbet</button>
               <button onClick={() => setShowSettingsPanel(true)} className="w-full flex items-center gap-3 p-3 bg-cyan-600/10 text-cyan-500 rounded-xl border border-cyan-600/20 font-black uppercase italic text-[10px]"><Settings size={18} /> Ayarlar</button>
-              <button onClick={toggleAdminPower} className={`w-full flex items-center gap-3 p-3 rounded-xl border font-black uppercase italic text-[10px] ${isAdmin ? 'bg-orange-600/20 text-orange-500 border-orange-600/40' : 'bg-white/5 text-zinc-500 border-white/10'}`}><ShieldAlert size={18} /> Admin: {isAdmin ? 'AÇIK' : 'KAPALI'}</button>
             </div>
 
             <div className="flex-1 flex flex-col min-h-0">
@@ -783,38 +851,91 @@ const handleAuth = async (e: React.FormEvent) => {
         </div>
       </div>
 
-      <div ref={scrollContainerRef} onMouseDown={handleMouseDown} onMouseLeave={() => setIsDragging(false)} onMouseUp={() => setIsDragging(false)} onMouseMove={handleMouseMove} className={`flex-1 overflow-x-auto custom-scrollbar flex items-start p-6 md:p-10 gap-6 md:gap-8 h-full transition-all duration-500 relative z-10 ${!isSidebarOpen ? 'md:pl-24' : ''} ${isDragging ? 'cursor-grabbing select-none' : 'cursor-default'}`}>
-        {categories.map((cat) => (
-          <div key={cat.id} className="w-[260px] md:w-[340px] shrink-0 bg-zinc-900/70 backdrop-blur-md border border-white/5 rounded-[2.5rem] flex flex-col max-h-[85vh] relative shadow-2xl">
-            <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
-                <h2 className="font-black text-[10px] md:text-[12px] uppercase tracking-widest text-blue-500 italic">{cat.name}</h2>
-                {isAdmin && <div className="flex gap-1">
-                    <button onClick={() => handleCategoryRename(cat.id, cat.name)} className="p-2 text-blue-500/50 hover:text-blue-500"><Edit3 size={16}/></button>
-                    <button onClick={() => deleteCategory(cat.id)} className="p-2 text-red-500/50 hover:text-red-500"><Trash2 size={16}/></button>
-                </div>}
+{/* Kompakt Grid - 7 sutun masaustu, 3 sutun mobil */}
+      <div 
+        ref={scrollContainerRef} 
+        onMouseDown={handleMouseDown} 
+        onMouseLeave={() => setIsDragging(false)} 
+        onMouseUp={() => setIsDragging(false)} 
+        onMouseMove={handleMouseMove} 
+        className={`flex-1 overflow-x-auto custom-scrollbar flex items-start p-3 md:p-6 gap-2 md:gap-3 h-full transition-all duration-500 relative z-10 ${!isSidebarOpen ? 'md:pl-20' : ''} ${isDragging ? 'cursor-grabbing select-none' : 'cursor-default'}`}
+      >
+        {categories.map((cat, catIndex) => (
+          <div 
+            key={cat.id} 
+            className="w-[calc(33.33vw-16px)] md:w-[calc(14.28vw-24px)] min-w-[140px] max-w-[200px] shrink-0 bg-zinc-900/80 backdrop-blur-md border border-white/5 rounded-2xl flex flex-col max-h-[calc(100vh-100px)] relative shadow-xl"
+          >
+            {/* Liste Basligi */}
+            <div className="p-2 md:p-3 flex items-center justify-between border-b border-white/5 gap-1">
+              <h2 className="font-black text-[8px] md:text-[10px] uppercase tracking-wide text-blue-500 italic truncate flex-1">{cat.name}</h2>
+              <div className="flex items-center gap-0.5">
+                {/* Sol/Sag Tasima Butonlari */}
+                <button onClick={() => moveCategoryOrder(catIndex, 'left')} disabled={catIndex === 0} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronLeft size={12}/></button>
+                <button onClick={() => moveCategoryOrder(catIndex, 'right')} disabled={catIndex === categories.length - 1} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronRight size={12}/></button>
+                {isAdmin && (
+                  <>
+                    <button onClick={() => handleCategoryRename(cat.id, cat.name)} className="p-1 text-blue-500/50 hover:text-blue-500"><Edit3 size={12}/></button>
+                    <button onClick={() => deleteCategory(cat.id)} className="p-1 text-red-500/50 hover:text-red-500"><Trash2 size={12}/></button>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
+            
+            {/* Kartlar - 4 kart gorunecek sekilde optimize */}
+            <div className="flex-1 overflow-y-auto p-1.5 md:p-2 space-y-1.5 md:space-y-2 custom-scrollbar-v flex flex-col">
               {files.filter(f => f.category === cat.id).map((file, idx) => (
-                <div key={file.id} className="bg-[#0f0f11]/90 backdrop-blur-sm border border-white/5 rounded-[1.8rem] overflow-hidden relative group hover:border-blue-600/40 transition-all">
-                  {isAdmin && <button onClick={() => startEditing(file)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16} /></button>}
-                  <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => moveItem(idx, 'up', cat.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600"><ChevronUp size={12}/></button>
-                    <button onClick={() => moveItem(idx, 'down', cat.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600"><ChevronDown size={12}/></button>
+                <div key={file.id} className="bg-[#0f0f11]/90 backdrop-blur-sm border border-white/5 rounded-xl overflow-hidden relative group hover:border-blue-600/40 transition-all">
+                  {/* Kart Kontrol Butonlari */}
+                  <div className="absolute top-1 right-1 flex gap-0.5 z-20 opacity-0 group-hover:opacity-100 transition-all">
+                    {isAdmin && <button onClick={() => startEditing(file)} className="bg-blue-600 p-1 rounded-md text-white"><Edit3 size={10} /></button>}
+                    <button onClick={(e) => setCardTransferMenu({ fileId: file.id, x: e.clientX, y: e.clientY })} className="bg-zinc-700 p-1 rounded-md text-white hover:bg-zinc-600"><MoreVertical size={10} /></button>
                   </div>
-                  <button onClick={() => handleCardClick(file)} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
-                    <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt="" />
+                  
+                  {/* Yukari/Asagi Tasima */}
+                  <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-20 opacity-0 group-hover:opacity-100 transition-all">
+                    <button onClick={() => moveItem(idx, 'up', cat.id)} className="bg-black/80 p-0.5 rounded hover:bg-blue-600"><ChevronUp size={10}/></button>
+                    <button onClick={() => moveItem(idx, 'down', cat.id)} className="bg-black/80 p-0.5 rounded hover:bg-blue-600"><ChevronDown size={10}/></button>
+                  </div>
+                  
+                  <button onClick={() => handleCardClick(file)} className="w-full aspect-[4/3] bg-black/40 relative block overflow-hidden">
+                    <img src={file.image_url} className="w-full h-full object-contain p-1 hover:scale-105 transition-transform duration-500" alt="" />
                   </button>
-                  <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-                    <span className="truncate pr-2">{file.title}</span>
-                    {isAdmin && <button onClick={() => deleteFile(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
+                  <div className="p-1.5 md:p-2 flex justify-between items-center font-black text-[7px] md:text-[9px] uppercase italic text-zinc-200">
+                    <span className="truncate pr-1">{file.title}</span>
+                    {isAdmin && <button onClick={() => deleteFile(file.id)} className="text-red-500 hover:scale-110 shrink-0"><Trash2 size={10}/></button>}
                   </div>
                 </div>
               ))}
-              <button onClick={() => { setTargetCategoryId(cat.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
+              <button onClick={() => { setTargetCategoryId(cat.id); setShowAddModal(true); }} className="w-full p-2 bg-white/[0.02] border border-dashed border-white/5 rounded-lg text-[8px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+</button>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Kart Transfer Menusu */}
+      {cardTransferMenu && (
+        <div 
+          className="fixed z-[1200] bg-zinc-900 border border-white/10 rounded-xl shadow-2xl p-2 min-w-[120px]"
+          style={{ left: cardTransferMenu.x, top: cardTransferMenu.y }}
+        >
+          <p className="text-[8px] font-black text-zinc-500 uppercase mb-2 px-2">Liste Degistir</p>
+          {categories.map(cat => (
+            <button 
+              key={cat.id}
+              onClick={() => transferCardToCategory(cardTransferMenu.fileId, cat.id)}
+              className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-zinc-300 hover:bg-blue-600/20 hover:text-blue-400 rounded-lg transition-all"
+            >
+              {cat.name}
+            </button>
+          ))}
+          <button 
+            onClick={() => setCardTransferMenu(null)}
+            className="w-full text-left px-2 py-1.5 text-[10px] font-bold text-red-500 hover:bg-red-600/20 rounded-lg transition-all mt-1 border-t border-white/5"
+          >
+            Iptal
+          </button>
+        </div>
+      )}
 
 {showActivityPanel && (
         <div className="fixed inset-0 z-[600] bg-[#050505] flex flex-col overflow-hidden">
@@ -929,52 +1050,65 @@ const handleAuth = async (e: React.FormEvent) => {
 
 {showChatPanel && (
         <div className="fixed inset-0 z-[700] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
-          <div className="w-full max-w-6xl h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-row shadow-4xl relative">
-            {/* Sol: Arkadaslar Panel */}
+          <div className="w-full max-w-5xl h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-[2rem] overflow-hidden flex flex-row shadow-4xl relative">
+            {/* Sol: Minimalist Sohbet Listesi */}
             {showFriendsPanel && (
-            <div className="w-80 border-r border-white/5 flex flex-col bg-zinc-900/30">
-              <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                <h3 className="font-black uppercase italic text-sm text-blue-500">Arkadaslar</h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 transition-all"><UserPlus size={18}/></button>
-                  <button onClick={() => setShowFriendsPanel(false)} className="p-2 bg-red-600/20 text-red-500 rounded-lg hover:bg-red-600 transition-all"><X size={18}/></button>
-                </div>
+            <div className="w-20 border-r border-white/5 flex flex-col bg-zinc-900/30">
+              <div className="p-3 border-b border-white/5 flex flex-col items-center gap-2">
+                <button onClick={() => setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-xl hover:bg-blue-600 transition-all"><UserPlus size={16}/></button>
+                <button onClick={() => setShowFriendsPanel(false)} className="p-2 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600 transition-all"><X size={14}/></button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-{/* Admin Sabit */}
-                 <div onClick={() => setActiveChatFriend(ADMIN_NAME)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === ADMIN_NAME ? 'bg-blue-600 border-blue-400 shadow-lg' : 'bg-blue-600/10 border-blue-600/20'}`}>
-                    <div className="relative">
-                      <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center font-black overflow-hidden">
-                        {userProfiles[ADMIN_NAME] ? <img src={userProfiles[ADMIN_NAME]} alt="" className="w-full h-full object-cover" /> : 'E'}
+              <div className="flex-1 overflow-y-auto p-2 space-y-2 flex flex-col items-center">
+                {/* Admin Sabit - Minimalist */}
+                <button 
+                  onClick={() => setActiveChatFriend(ADMIN_NAME)} 
+                  className={`relative w-12 h-12 rounded-full transition-all ${activeChatFriend === ADMIN_NAME ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900' : 'hover:scale-110'}`}
+                  title="Emre (Admin)"
+                >
+                  <div className="w-full h-full bg-blue-900 rounded-full flex items-center justify-center font-black overflow-hidden">
+                    {userProfiles[ADMIN_NAME] ? <img src={userProfiles[ADMIN_NAME]} alt="" className="w-full h-full object-cover" /> : 'E'}
+                  </div>
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(ADMIN_NAME) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
+                </button>
+                
+                {/* Ekli Arkadaslar - Minimalist */}
+                {friends.map((fName, i) => (
+                  <div key={i} className="relative group">
+                    <button 
+                      onClick={() => setActiveChatFriend(fName)} 
+                      className={`relative w-12 h-12 rounded-full transition-all ${activeChatFriend === fName ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-zinc-900' : 'hover:scale-110'}`}
+                      title={fName}
+                    >
+                      <div className="w-full h-full bg-zinc-800 rounded-full flex items-center justify-center font-black italic overflow-hidden text-xs">
+                        {userProfiles[fName] ? <img src={userProfiles[fName]} alt="" className="w-full h-full object-cover" /> : fName[0].toUpperCase()}
                       </div>
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(ADMIN_NAME) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
-                    </div>
-                    <div className="flex-1">
-                        <p className="text-xs font-black uppercase italic">Emre (Admin)</p>
-                        <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(ADMIN_NAME) ? 'text-green-400' : 'text-white/50'}`}>
-                          {isUserOnline(ADMIN_NAME) ? <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/> : <Clock size={8}/>}
-                          {getLastSeen(ADMIN_NAME)}
-                        </p>
-                    </div>
-                 </div>
-                 {/* Ekli Arkadaslar */}
-                 {friends.map((fName, i) => (
-                    <div key={i} onClick={() => setActiveChatFriend(fName)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === fName ? 'bg-zinc-700 border-zinc-500 shadow-lg' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
-                       <div className="relative">
-                         <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center font-black italic overflow-hidden">
-                           {userProfiles[fName] ? <img src={userProfiles[fName]} alt="" className="w-full h-full object-cover" /> : fName[0].toUpperCase()}
-                         </div>
-                         <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(fName) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
-                       </div>
-                       <div className="flex-1">
-                          <p className="text-xs font-black uppercase italic">{fName}</p>
-                          <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(fName) ? 'text-green-400' : 'text-zinc-500'}`}>
-                            {isUserOnline(fName) ? <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/> : <Clock size={8}/>}
-                            {getLastSeen(fName)}
-                          </p>
-                       </div>
-                    </div>
-                 ))}
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(fName) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
+                    </button>
+                    {/* Silme Butonu */}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleRemoveFriend(fName); }}
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <X size={10} className="text-white"/>
+                    </button>
+                  </div>
+                ))}
+                
+                {/* Aktif Sohbetler (Otomatik baslayanlar) */}
+                {activeConversations.filter(c => !friends.includes(c) && c !== ADMIN_NAME).map((convName, i) => (
+                  <div key={`conv-${i}`} className="relative group">
+                    <button 
+                      onClick={() => setActiveChatFriend(convName)} 
+                      className={`relative w-12 h-12 rounded-full transition-all border-2 border-dashed border-zinc-600 ${activeChatFriend === convName ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-zinc-900' : 'hover:scale-110'}`}
+                      title={`${convName} (Yeni Sohbet)`}
+                    >
+                      <div className="w-full h-full bg-zinc-800/50 rounded-full flex items-center justify-center font-black italic overflow-hidden text-xs text-zinc-400">
+                        {userProfiles[convName] ? <img src={userProfiles[convName]} alt="" className="w-full h-full object-cover" /> : convName[0].toUpperCase()}
+                      </div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(convName) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
             )}
@@ -1005,9 +1139,13 @@ const handleAuth = async (e: React.FormEvent) => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {/* Chat Settings Button */}
+                            {/* Chat Background Upload */}
+                            <label className="p-2 bg-purple-600/20 text-purple-500 rounded-xl hover:bg-purple-600 transition-all cursor-pointer" title="Arka plan yukle">
+                              <Upload size={18}/>
+                              <input type="file" accept="image/*" className="hidden" onChange={handleChatBgUpload} />
+                            </label>
                             <button data-chat-settings onClick={() => {
-                              const url = prompt("Sohbet arka plan URL (CTRL+V ile de yapistirabilirsin):", chatBackgroundSettings.imageUrl);
+                              const url = prompt("Sohbet arka plan URL (veya dosya yukle):", chatBackgroundSettings.imageUrl);
                               if (url !== null) {
                                 const newSettings = { ...chatBackgroundSettings, imageUrl: url };
                                 setChatBackgroundSettings(newSettings);
@@ -1223,9 +1361,28 @@ const handleAuth = async (e: React.FormEvent) => {
             </div>
             
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar-v">
+              {/* Hizli Erisim Butonlari */}
+              <div>
+                <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><Activity size={16}/> Hizli Erisim</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => { fetchAllData(); setShowActivityPanel(true); setShowSettingsPanel(false); }} 
+                    className="p-4 bg-green-600/10 text-green-500 rounded-2xl border border-green-600/20 font-black uppercase italic text-[10px] hover:bg-green-600/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Activity size={18}/> Aktiviteler
+                  </button>
+                  <button 
+                    onClick={toggleAdminPower} 
+                    className={`p-4 rounded-2xl border font-black uppercase italic text-[10px] transition-all flex items-center justify-center gap-2 ${isAdmin ? 'bg-orange-600/20 text-orange-500 border-orange-600/40' : 'bg-white/5 text-zinc-500 border-white/10 hover:bg-white/10'}`}
+                  >
+                    <ShieldAlert size={18}/> Admin: {isAdmin ? 'ACIK' : 'KAPALI'}
+                  </button>
+                </div>
+              </div>
+              
               {/* Arka Plan Türü Seçimi */}
               <div>
-                <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><Palette size={16}/> Arka Plan Türü</h3>
+                <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><Palette size={16}/> Arka Plan Turu</h3>
                 <div className="grid grid-cols-3 gap-3">
                   <button 
                     onClick={() => {
