@@ -48,7 +48,7 @@ interface Message {
 export default function EmreBoard() {
   // --- EKSİK OLAN SESSION STATE BURADA ---
   const [session, setSession] = useState<any>(null);
-
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login'); // Bunu tam buraya ekle
   // ── Ana veri ──────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<Category[]>([]);
   const [files, setFiles] = useState<ArchiveItem[]>([]);
