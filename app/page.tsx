@@ -817,7 +817,6 @@ const handleChangeList = async (newListId: string) => {
 </div>
                 <button onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
               </div>
-            </div>
           );
         })}
       </div>
