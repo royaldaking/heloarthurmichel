@@ -50,7 +50,7 @@ export default function EmreBoard() {
   const [session, setSession] = useState<any>(null);
 
   // ── Ana veri ──────────────────────────────────────────────────────────────
-  const [categories, setCategories] = useState<List[]>([]);
+  const [categories, setCategories] = useState<Category[]>
   const [files, setFiles] = useState<Card[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
