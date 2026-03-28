@@ -295,7 +295,7 @@ export default function EmreBoard() {
   const pickGlobalRandom = () => {
     if (files.length === 0) return;
     const picked = files[Math.floor(Math.random() * files.length)];
-    setRandomfiles(picked);
+    setRandomFiles(picked);
     setGlowfilesId(picked.id);
     setTimeout(() => {
       const el = document.getElementById(`files-${picked.id}`);
@@ -1268,15 +1268,15 @@ export default function EmreBoard() {
       )}
 
       {/* ŞANSLI KART MODAL */}
-      {randomfiles && (
-        <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomfiles(null)}>
+      {randomFiles && (
+        <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
-            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4"><img src={randomfiles.image_url} className="w-full h-full object-contain" alt="" /></div>
+            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4"><img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" /></div>
             <div className="text-center pb-6">
-              <h2 className="text-3xl font-black italic uppercase mb-8">{randomfiles.title}</h2>
+              <h2 className="text-3xl font-black italic uppercase mb-8">{randomFiles.title}</h2>
               <div className="flex gap-4 px-6">
-                <button onClick={() => setRandomfiles(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
-                <button onClick={() => handlefilesClick(randomfiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
+                <button onClick={() => setRandomFiles(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
+                <button onClick={() => handlefilesClick(randomFiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
               </div>
             </div>
           </div>
