@@ -301,7 +301,7 @@ export default function EmreBoard() {
       const el = document.getElementById(`files-${picked.id}`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
-    setTimeout(() => setGlowfilesId(null), 3000);
+    setTimeout(() => setGlowFilesId(null), 3000);
   };
 
   // ── ARKA PLAN DOSYA YÜKLEMESİ ────────────────────────────────────────────
