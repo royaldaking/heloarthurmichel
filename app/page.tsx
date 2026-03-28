@@ -210,29 +210,12 @@ export default function EmreBoard() {
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   // ── VERİ ÇEKME ────────────────────────────────────────────────────────────
-  // Tablo: lists  → sütunlar: id, title, order
-  // Tablo: cards  → sütunlar: id, title, mega_url, image_url, list_id, order
-  // Tablo: logs   → sütunlar: id, created_at, title, image_url, user_name, card_id
   async function fetchAllData() {
-    const { data: listData, error: listErr } = await supabase
-      .from("lists")
-      .select("*")
-      .order("order", { ascending: true });
-    if (listErr) console.error("lists fetch error:", listErr);
-    if (listData) setLists(listData as List[]);
-
-    const { data: cardData, error: cardErr } = await supabase
-      .from("cards")
-      .select("*")
-      .order("order", { ascending: true });
-    if (cardErr) console.error("cards fetch error:", cardErr);
-    if (cardData) setCards(cardData as Card[]);
-
-    const { data: logData, error: logErr } = await supabase
-      .from("logs")
-      .select("*")
-      .order("id", { ascending: false });
-    if (logErr) console.error("logs fetch error:", logErr);
+    const { data: catData } = await supabase.from("kategoriler").select("*").order("id", { ascending: true });
+    if (catData) setCategories(catData as Category[]);
+    const { data: fileData } = await supabase.from("arsiv").select("*").order("order_index", { ascending: true });
+    if (fileData) setFiles(fileData as ArchiveItem[]);
+    const { data: logData } = await supabase.from("logs").select("*").order("id", { ascending: false });
     if (logData) setLogs(logData as LogEntry[]);
   }
 
@@ -364,16 +347,12 @@ export default function EmreBoard() {
     alert(`${target} eklendi!`);
   };
 
-  // ── KART TIKLAMA — log kaydı: card_id sütunu kullan ─────────────────────
-  const handleCardClick = async (card: Card) => {
-    await supabase.from("logs").insert([{
-      title: card.title,
-      image_url: card.image_url,
-      user_name: currentUserName,
-      card_id: card.id
+  const handleCardClick = async (file: ArchiveItem) => {
+    await supabase.from("logs").insert([{ 
+        title: file.title, image_url: file.image_url, user_name: currentUserName, file_id: file.id
     }]);
     fetchAllData();
-    window.open(card.mega_url, "_blank");
+    window.open(file.mega_url, "_blank");
   };
 
   const handleUserPhotoUpload = async (uName: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -381,12 +360,13 @@ export default function EmreBoard() {
     if (!file) return;
     setLoading(true);
     try {
-      const fn = `profile-${uName}-${Date.now()}`;
-      await supabase.storage.from("arsiv-dosyalari").upload(fn, file);
-      const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
-      const np = { ...userProfiles, [uName]: ud.publicUrl };
-      setUserProfiles(np);
-      localStorage.setItem("emre_board_profiles", JSON.stringify(np));
+      const fileName = `profile-${uName}-${Date.now()}`;
+      await supabase.storage.from("arsiv-dosyalari").upload(fileName, file);
+      const { data: urlData } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fileName);
+      const newProfiles = { ...userProfiles, [uName]: urlData.publicUrl };
+      setUserProfiles(newProfiles);
+      localStorage.setItem("emre_board_profiles", JSON.stringify(newProfiles));
+      alert("Profil fotoğrafı güncellendi!");
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
@@ -1258,19 +1238,16 @@ export default function EmreBoard() {
         </div>
       )}
 
-      {/* ── GLOBAL RANDOM CARD MODAL ────────────────────────────────────────── */}
+      {/* ŞANSLI KART MODAL */}
       {randomCard && (
         <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomCard(null)}>
-          <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem] shadow-4xl" onClick={e => e.stopPropagation()}>
-            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4">
-              <img src={randomCard.image_url} className="w-full h-full object-contain" alt=""/>
-            </div>
+          <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
+            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4"><img src={randomCard.image_url} className="w-full h-full object-contain" alt="" /></div>
             <div className="text-center pb-6">
-              <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-2">🎲 Seçilen Kart</p>
               <h2 className="text-3xl font-black italic uppercase mb-8">{randomCard.title}</h2>
               <div className="flex gap-4 px-6">
                 <button onClick={() => setRandomCard(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
-                <button onClick={() => handleCardClick(randomCard)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">GİT</button>
+                <button onClick={() => handleCardClick(randomCard)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
               </div>
             </div>
           </div>
