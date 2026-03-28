@@ -253,7 +253,7 @@ export default function EmreBoard() {
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
   const moveCard = async (index: number, direction: 'up' | 'down', listId: string) => {
-    const listCards = [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
+    const listCards = [...files.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
     const tIdx = direction === 'up' ? index - 1 : index + 1;
     if (tIdx < 0 || tIdx >= listCards.length) return;
     const cur = listCards[index];
@@ -270,7 +270,7 @@ export default function EmreBoard() {
   // ── KART LİSTE DEĞİŞTİRME ────────────────────────────────────────────────
   const handleChangeList = async (newListId: string) => {
     if (!changeCatTarget) return;
-    const listCards = cards.filter(c => c.list_id === newListId);
+    const listCards = files.filter(c => c.list_id === newListId);
     const maxIdx = listCards.length > 0 ? Math.max(...listCards.map(c => c.order_index)) : 0;
     await supabase.from("arsiv").update({ list_id: newListId, order_index: maxIdx + 1 }).eq("id", changeCatTarget.id);
     setShowChangeCatModal(false);
@@ -443,7 +443,7 @@ export default function EmreBoard() {
     if (matched) {
       setSearchedUserData({
         user: matched,
-        cards: cards.filter(c => logs.some(l => l.card_id === c.id && l.user_name === matched)),
+        cards: files.filter(c => logs.some(l => l.card_id === c.id && l.user_name === matched)),
         logs: logs.filter(l => l.user_name === matched)
       });
     } else { setSearchedUserData(null); alert("Kullanıcı bulunamadı!"); }
@@ -472,7 +472,7 @@ export default function EmreBoard() {
       }
       let oi = editingCard.order_index;
       if (editListId !== editingCard.list_id) {
-        const lc = cards.filter(c => c.list_id === editListId);
+        const lc = files.filter(c => c.list_id === editListId);
         oi = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) + 1 : 0;
       }
       await supabase.from("arsiv").update({
@@ -546,7 +546,7 @@ export default function EmreBoard() {
       const fn = `${Date.now()}-${selectedFile.name.replace(/\s/g, '-')}`;
       await supabase.storage.from("arsiv-dosyalari").upload(fn, selectedFile);
       const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
-      const lc = cards.filter(c => c.list_id === targetListId);
+      const lc = files.filter(c => c.list_id === targetListId);
       const maxIdx = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) : 0;
       await supabase.from("arsiv").insert([{
         title: title.toUpperCase(),
@@ -584,7 +584,7 @@ export default function EmreBoard() {
   };
 
   const getSortedListCards = (listId: string) =>
-    [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
+    [...files.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
 
   const saveBg = (s: BackgroundSettings) => {
     setBackgroundSettings(s);
