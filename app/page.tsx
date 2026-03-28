@@ -13,10 +13,11 @@ const supabaseUrl = "https://wobnwchodzgsofpybztg.supabase.co";
 const supabaseKey = "sb_publishable_JgD3W7_LA5OLvE_j2GzgSw_4vBaKN7N";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-interface Category { id: string; name: string; order: number; }
-interface ArchiveItem { id: number; title: string; mega_url: string; image_url: string; category: string; order: number; }
-interface LogEntry { id: number; created_at: string; title: string; image_url: string; user_name?: string; file_id?: number | null; }
-interface Message { id?: number; created_at?: string; sender_name: string; receiver_name: string; text: string; }
+// ── TYPES ─────────────────────────────────────────────────────────────────────
+interface List     { id: string; title: string; order: number; }
+interface Card     { id: number; title: string; mega_url: string; image_url: string; list_id: string; order: number; }
+interface LogEntry { id: number; created_at: string; title: string; image_url: string; user_name?: string; card_id?: number | null; }
+interface Message  { id?: number; created_at?: string; sender_name: string; receiver_name: string; text: string; }
 interface BackgroundSettings {
   type: 'solid' | 'gradient' | 'image';
   solidColor: string;
@@ -36,14 +37,17 @@ export default function EmreBoard() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [files, setFiles] = useState<ArchiveItem[]>([]);
+
+  // ── Ana veri ──────────────────────────────────────────────────────────────
+  const [lists, setLists] = useState<List[]>([]);
+  const [cards, setCards] = useState<Card[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [userProfiles, setUserProfiles] = useState<{ [key: string]: string }>({});
   const [friends, setFriends] = useState<string[]>([]);
 
-  // ── Sohbet ──────────────────────────────────────────────────────────────────
+  // ── Sohbet ────────────────────────────────────────────────────────────────
   const [activeChatFriend, setActiveChatFriend] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -56,22 +60,22 @@ export default function EmreBoard() {
   const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [showStatsDetail, setShowStatsDetail] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
-  const [editingItem, setEditingItem] = useState<ArchiveItem | null>(null);
+  const [editingCard, setEditingCard] = useState<Card | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editMegaUrl, setEditMegaUrl] = useState("");
   const [editFile, setEditFile] = useState<File | null>(null);
-  const [editCategory, setEditCategory] = useState("");
+  const [editListId, setEditListId] = useState("");
 
   const [showChangeCatModal, setShowChangeCatModal] = useState(false);
-  const [changeCatTarget, setChangeCatTarget] = useState<ArchiveItem | null>(null);
+  const [changeCatTarget, setChangeCatTarget] = useState<Card | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  // ── Global random card (floating dice button) ────────────────────────────
-  const [randomCard, setRandomCard] = useState<ArchiveItem | null>(null);
-  // ── Per-list glow ────────────────────────────────────────────────────────
+
+  // ── Global random card (floating dice button) ─────────────────────────────
+  const [randomCard, setRandomCard] = useState<Card | null>(null);
   const [glowCardId, setGlowCardId] = useState<number | null>(null);
 
-  const [targetCategoryId, setTargetCategoryId] = useState("");
+  const [targetListId, setTargetListId] = useState("");
   const [title, setTitle] = useState("");
   const [megaUrl, setMegaUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -88,7 +92,7 @@ export default function EmreBoard() {
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showSystemLogs, setShowSystemLogs] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
-  const [searchedUserData, setSearchedUserData] = useState<{ user: string; files: ArchiveItem[]; logs: LogEntry[] } | null>(null);
+  const [searchedUserData, setSearchedUserData] = useState<{ user: string; cards: Card[]; logs: LogEntry[] } | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<{ [key: string]: { online: boolean; last_seen: string } }>({});
   const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
     type: 'solid', solidColor: '#050505', gradientStart: '#050505',
@@ -105,7 +109,7 @@ export default function EmreBoard() {
 
   const currentUserName = session?.user?.user_metadata?.display_name || session?.user?.email?.split('@')[0] || "Anonim";
 
-  // ── İLK YÜKLEME ─────────────────────────────────────────────────────────────
+  // ── İLK YÜKLEME ──────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -127,7 +131,7 @@ export default function EmreBoard() {
     return () => { authListener.subscription.unsubscribe(); };
   }, []);
 
-  // ── CTRL+V PASTE ─────────────────────────────────────────────────────────────
+  // ── CTRL+V PASTE ──────────────────────────────────────────────────────────
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       if (!showAddModal && !showEditModal) return;
@@ -148,7 +152,7 @@ export default function EmreBoard() {
     return () => window.removeEventListener('paste', onPaste);
   }, [showAddModal, showEditModal]);
 
-  // ── PRESENCE ─────────────────────────────────────────────────────────────────
+  // ── PRESENCE ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!session || !currentUserName) return;
     const ch = supabase.channel('online-users', { config: { presence: { key: currentUserName } } });
@@ -164,7 +168,7 @@ export default function EmreBoard() {
     return () => { supabase.removeChannel(ch); };
   }, [session, currentUserName]);
 
-  // ── SOHBET REALTIME ──────────────────────────────────────────────────────────
+  // ── SOHBET REALTIME ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!showChatPanel || !activeChatFriend) return;
     const fetch = async () => {
@@ -184,8 +188,8 @@ export default function EmreBoard() {
     return () => { supabase.removeChannel(ch); };
   }, [showChatPanel, activeChatFriend, currentUserName]);
 
-  // ── OTOMATİK ARKADAŞ EKLEMESİ ───────────────────────────────────────────────
-  // Herhangi bir kullanıcı bana mesaj gönderdiğinde onun adını arkadaş listeme ekle
+  // ── OTOMATİK ARKADAŞ EKLEMESİ ────────────────────────────────────────────
+  // Bana mesaj gönderen kullanıcı otomatik arkadaş listesine eklenir
   useEffect(() => {
     if (!session || !currentUserName) return;
     const ch = supabase.channel(`inbox:${currentUserName}`)
@@ -205,64 +209,81 @@ export default function EmreBoard() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  // ── VERİ ÇEKME — her zaman order asc ───────────────────────────────────
+  // ── VERİ ÇEKME ────────────────────────────────────────────────────────────
+  // Tablo: lists  → sütunlar: id, title, order
+  // Tablo: cards  → sütunlar: id, title, mega_url, image_url, list_id, order
+  // Tablo: logs   → sütunlar: id, created_at, title, image_url, user_name, card_id
   async function fetchAllData() {
-    const { data: catData } = await supabase.from("lists").select("*").order("order", { ascending: true });
-    if (catData) setCategories(catData as Category[]);
-    const { data: fileData } = await supabase.from("arsiv").select("*").order("order", { ascending: true });
-    if (fileData) setFiles(fileData as ArchiveItem[]);
-    const { data: logData } = await supabase.from("logs").select("*").order("id", { ascending: false });
+    const { data: listData, error: listErr } = await supabase
+      .from("lists")
+      .select("*")
+      .order("order", { ascending: true });
+    if (listErr) console.error("lists fetch error:", listErr);
+    if (listData) setLists(listData as List[]);
+
+    const { data: cardData, error: cardErr } = await supabase
+      .from("cards")
+      .select("*")
+      .order("order", { ascending: true });
+    if (cardErr) console.error("cards fetch error:", cardErr);
+    if (cardData) setCards(cardData as Card[]);
+
+    const { data: logData, error: logErr } = await supabase
+      .from("logs")
+      .select("*")
+      .order("id", { ascending: false });
+    if (logErr) console.error("logs fetch error:", logErr);
     if (logData) setLogs(logData as LogEntry[]);
   }
 
-  // ── LİSTE TAŞIMA — optimistik state ─────────────────────────────────────────
-  const moveCategory = async (index: number, direction: 'left' | 'right') => {
+  // ── LİSTE TAŞIMA — optimistik state ──────────────────────────────────────
+  const moveList = async (index: number, direction: 'left' | 'right') => {
     const tIdx = direction === 'left' ? index - 1 : index + 1;
-    if (tIdx < 0 || tIdx >= categories.length) return;
-    const cur = categories[index];
-    const tar = categories[tIdx];
-    // Optimistik güncelle
-    const updated = categories.map((c, i) => {
-      if (i === index) return { ...c, order: tar.order };
-      if (i === tIdx)  return { ...c, order: cur.order };
-      return c;
+    if (tIdx < 0 || tIdx >= lists.length) return;
+    const cur = lists[index];
+    const tar = lists[tIdx];
+    const updated = lists.map((l, i) => {
+      if (i === index) return { ...l, order: tar.order };
+      if (i === tIdx)  return { ...l, order: cur.order };
+      return l;
     });
-    setCategories([...updated].sort((a, b) => a.order - b.order));
+    setLists([...updated].sort((a, b) => a.order - b.order));
     await supabase.from("lists").update({ order: tar.order }).eq("id", cur.id);
     await supabase.from("lists").update({ order: cur.order }).eq("id", tar.id);
   };
 
-  // ── KART SIRALAMA — optimistik state ─────────────────────────────────────────
-  const moveItem = async (index: number, direction: 'up' | 'down', catId: string) => {
-    const catFiles = [...files.filter(f => f.category === catId)].sort((a, b) => a.order - b.order);
+  // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
+  const moveCard = async (index: number, direction: 'up' | 'down', listId: string) => {
+    const listCards = [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order - b.order);
     const tIdx = direction === 'up' ? index - 1 : index + 1;
-    if (tIdx < 0 || tIdx >= catFiles.length) return;
-    const cur = catFiles[index];
-    const tar = catFiles[tIdx];
-    setFiles(prev => prev.map(f => {
-      if (f.id === cur.id) return { ...f, order: tar.order };
-      if (f.id === tar.id) return { ...f, order: cur.order };
-      return f;
+    if (tIdx < 0 || tIdx >= listCards.length) return;
+    const cur = listCards[index];
+    const tar = listCards[tIdx];
+    setCards(prev => prev.map(c => {
+      if (c.id === cur.id) return { ...c, order: tar.order };
+      if (c.id === tar.id) return { ...c, order: cur.order };
+      return c;
     }));
-    await supabase.from("arsiv").update({ order: tar.order }).eq("id", cur.id);
-    await supabase.from("arsiv").update({ order: cur.order }).eq("id", tar.id);
+    await supabase.from("cards").update({ order: tar.order }).eq("id", cur.id);
+    await supabase.from("cards").update({ order: cur.order }).eq("id", tar.id);
   };
 
-  // ── KART LİSTE DEĞİŞTİRME ───────────────────────────────────────────────────
-  const handleChangeCategory = async (newCatId: string) => {
+  // ── KART LİSTE DEĞİŞTİRME ────────────────────────────────────────────────
+  const handleChangeList = async (newListId: string) => {
     if (!changeCatTarget) return;
-    const catFiles = files.filter(f => f.category === newCatId);
-    const maxIdx = catFiles.length > 0 ? Math.max(...catFiles.map(f => f.order)) : 0;
-    await supabase.from("arsiv").update({ category: newCatId, order: maxIdx + 1 }).eq("id", changeCatTarget.id);
-    setShowChangeCatModal(false); setChangeCatTarget(null);
+    const listCards = cards.filter(c => c.list_id === newListId);
+    const maxIdx = listCards.length > 0 ? Math.max(...listCards.map(c => c.order)) : 0;
+    await supabase.from("cards").update({ list_id: newListId, order: maxIdx + 1 }).eq("id", changeCatTarget.id);
+    setShowChangeCatModal(false);
+    setChangeCatTarget(null);
     fetchAllData();
   };
 
-  // ── GLOBAL RASTGELE KART (sağ-alt buton) ────────────────────────────────────
+  // ── GLOBAL RASTGELE KART (sağ-alt buton) ─────────────────────────────────
   const pickGlobalRandom = () => {
-    if (files.length === 0) return;
-    const picked = files[Math.floor(Math.random() * files.length)];
-    setRandomCard(picked);       // modal açılır
+    if (cards.length === 0) return;
+    const picked = cards[Math.floor(Math.random() * cards.length)];
+    setRandomCard(picked);
     setGlowCardId(picked.id);
     setTimeout(() => {
       const el = document.getElementById(`card-${picked.id}`);
@@ -271,7 +292,7 @@ export default function EmreBoard() {
     setTimeout(() => setGlowCardId(null), 3000);
   };
 
-  // ── ARKA PLAN DOSYA YÜKLEMESİ ───────────────────────────────────────────────
+  // ── ARKA PLAN DOSYA YÜKLEMESİ ────────────────────────────────────────────
   const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -287,7 +308,7 @@ export default function EmreBoard() {
     } catch (err: any) { alert(err.message); } finally { setBgUploading(false); }
   };
 
-  // ── PROFİL GÜNCELLEME ────────────────────────────────────────────────────────
+  // ── PROFİL GÜNCELLEME ─────────────────────────────────────────────────────
   const handleProfileUpdate = async () => {
     setProfileLoading(true);
     try {
@@ -302,17 +323,21 @@ export default function EmreBoard() {
       const ud: any = {};
       if (newDisplayName.trim() && newDisplayName.trim() !== currentUserName) ud.display_name = newDisplayName.trim();
       if (finalAvatarUrl) ud.avatar_url = finalAvatarUrl;
-      if (Object.keys(ud).length > 0) { const { error } = await supabase.auth.updateUser({ data: ud }); if (error) throw error; }
+      if (Object.keys(ud).length > 0) {
+        const { error } = await supabase.auth.updateUser({ data: ud });
+        if (error) throw error;
+      }
       const tn = newDisplayName.trim() || currentUserName;
       const np = { ...userProfiles, [tn]: finalAvatarUrl };
       if (newDisplayName.trim() && newDisplayName.trim() !== currentUserName) np[currentUserName] = finalAvatarUrl;
-      setUserProfiles(np); localStorage.setItem("emre_board_profiles", JSON.stringify(np));
+      setUserProfiles(np);
+      localStorage.setItem("emre_board_profiles", JSON.stringify(np));
       setShowProfileEdit(false); setNewDisplayName(""); setNewProfileFile(null);
       alert("Profil güncellendi! Değişikliklerin görünmesi için sayfayı yenileyin.");
     } catch (err: any) { alert(err.message); } finally { setProfileLoading(false); }
   };
 
-  // ── MESAJ GÖNDER (sadeleştirilmiş — dosya yok) ──────────────────────────────
+  // ── MESAJ GÖNDER ──────────────────────────────────────────────────────────
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeChatFriend) return;
@@ -333,15 +358,22 @@ export default function EmreBoard() {
     const { data: uc } = await supabase.from("logs").select("user_name").eq("user_name", target).limit(1);
     if (!uc || uc.length === 0) { alert("Kullanıcı bulunamadı veya henüz aktivite yok."); return; }
     const nf = [...friends, target];
-    setFriends(nf); localStorage.setItem("emre_board_friends", JSON.stringify(nf));
+    setFriends(nf);
+    localStorage.setItem("emre_board_friends", JSON.stringify(nf));
     setSearchFriendName(""); setShowAddFriendModal(false);
     alert(`${target} eklendi!`);
   };
 
-  const handleCardClick = async (file: ArchiveItem) => {
-    await supabase.from("logs").insert([{ title: file.title, image_url: file.image_url, user_name: currentUserName, file_id: file.id }]);
+  // ── KART TIKLAMA — log kaydı: card_id sütunu kullan ─────────────────────
+  const handleCardClick = async (card: Card) => {
+    await supabase.from("logs").insert([{
+      title: card.title,
+      image_url: card.image_url,
+      user_name: currentUserName,
+      card_id: card.id
+    }]);
     fetchAllData();
-    window.open(file.mega_url, "_blank");
+    window.open(card.mega_url, "_blank");
   };
 
   const handleUserPhotoUpload = async (uName: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -353,16 +385,25 @@ export default function EmreBoard() {
       await supabase.storage.from("arsiv-dosyalari").upload(fn, file);
       const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
       const np = { ...userProfiles, [uName]: ud.publicUrl };
-      setUserProfiles(np); localStorage.setItem("emre_board_profiles", JSON.stringify(np));
+      setUserProfiles(np);
+      localStorage.setItem("emre_board_profiles", JSON.stringify(np));
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
+  // ── İSTATİSTİK — card_id üzerinden hesapla ───────────────────────────────
   const getStats = () => {
     const m: { [k: string]: any } = {};
     logs.forEach(log => {
-      if (!log.file_id) return;
-      const id = log.file_id;
-      if (!m[id]) m[id] = { id, title: log.title, image_url: log.image_url, mega_url: files.find(f => f.id === id)?.mega_url || "#", totalClicks: 0, users: {} };
+      if (!log.card_id) return;
+      const id = log.card_id;
+      if (!m[id]) m[id] = {
+        id,
+        title: log.title,
+        image_url: log.image_url,
+        mega_url: cards.find(c => c.id === id)?.mega_url || "#",
+        totalClicks: 0,
+        users: {}
+      };
       m[id].totalClicks++;
       const u = log.user_name || "Anonim";
       if (!m[id].users[u]) m[id].users[u] = { count: 0, lastDate: log.created_at };
@@ -372,9 +413,9 @@ export default function EmreBoard() {
     return Object.values(m).sort((a: any, b: any) => b.totalClicks - a.totalClicks);
   };
 
-  const deleteStatLogs = async (fileId: number | string) => {
+  const deleteStatLogs = async (cardId: number | string) => {
     if (!isAdmin || !confirm("Sıfırlansın mı?")) return;
-    const { error } = await supabase.from("logs").update({ file_id: null }).eq("file_id", fileId);
+    const { error } = await supabase.from("logs").update({ card_id: null }).eq("card_id", cardId);
     if (!error) fetchAllData();
   };
 
@@ -404,43 +445,64 @@ export default function EmreBoard() {
     const q = userSearchQuery.toLowerCase();
     const matched = getVisibleUsers().find(u => u.toLowerCase().includes(q));
     if (matched) {
-      setSearchedUserData({ user: matched, files: files.filter(f => logs.some(l => l.file_id === f.id && l.user_name === matched)), logs: logs.filter(l => l.user_name === matched) });
+      setSearchedUserData({
+        user: matched,
+        cards: cards.filter(c => logs.some(l => l.card_id === c.id && l.user_name === matched)),
+        logs: logs.filter(l => l.user_name === matched)
+      });
     } else { setSearchedUserData(null); alert("Kullanıcı bulunamadı!"); }
   };
 
-  const startEditing = (file: ArchiveItem) => {
-    setEditingItem(file); setEditTitle(file.title); setEditMegaUrl(file.mega_url);
-    setEditFile(null); setEditCategory(file.category); setShowEditModal(true);
+  const startEditing = (card: Card) => {
+    setEditingCard(card);
+    setEditTitle(card.title);
+    setEditMegaUrl(card.mega_url);
+    setEditFile(null);
+    setEditListId(card.list_id);
+    setShowEditModal(true);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingItem) return;
+    if (!editingCard) return;
     setLoading(true);
     try {
-      let img = editingItem.image_url;
+      let img = editingCard.image_url;
       if (editFile) {
         const fn = `card-${Date.now()}-${editFile.name.replace(/\s/g, '-')}`;
         await supabase.storage.from("arsiv-dosyalari").upload(fn, editFile);
         const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
         img = ud.publicUrl;
       }
-      let oi = editingItem.order;
-      if (editCategory !== editingItem.category) {
-        const cf = files.filter(f => f.category === editCategory);
-        oi = cf.length > 0 ? Math.max(...cf.map(f => f.order)) + 1 : 0;
+      let oi = editingCard.order;
+      if (editListId !== editingCard.list_id) {
+        const lc = cards.filter(c => c.list_id === editListId);
+        oi = lc.length > 0 ? Math.max(...lc.map(c => c.order)) + 1 : 0;
       }
-      await supabase.from("arsiv").update({ title: editTitle.toUpperCase(), mega_url: editMegaUrl, image_url: img, category: editCategory, order: oi }).eq("id", editingItem.id);
-      setShowEditModal(false); fetchAllData();
+      await supabase.from("cards").update({
+        title: editTitle.toUpperCase(),
+        mega_url: editMegaUrl,
+        image_url: img,
+        list_id: editListId,
+        order: oi
+      }).eq("id", editingCard.id);
+      setShowEditModal(false);
+      fetchAllData();
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
-  const handleCategoryRename = async (id: string, oldName: string) => {
-    const n = prompt("Yeni isim:", oldName);
+  const handleListRename = async (id: string, oldTitle: string) => {
+    const n = prompt("Yeni isim:", oldTitle);
     if (n) { await supabase.from("lists").update({ title: n }).eq("id", id); fetchAllData(); }
   };
-  const deleteCategory = async (id: string) => { if (confirm("Silinsin mi?")) { await supabase.from("lists").delete().eq("id", id); fetchAllData(); } };
-  const deleteFile = async (id: number) => { if (confirm("Kart silinsin mi?")) { await supabase.from("arsiv").delete().eq("id", id); fetchAllData(); } };
+
+  const deleteList = async (id: string) => {
+    if (confirm("Silinsin mi?")) { await supabase.from("lists").delete().eq("id", id); fetchAllData(); }
+  };
+
+  const deleteCard = async (id: number) => {
+    if (confirm("Kart silinsin mi?")) { await supabase.from("cards").delete().eq("id", id); fetchAllData(); }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault(); setAuthLoading(true);
@@ -450,42 +512,63 @@ export default function EmreBoard() {
         if (error) throw error;
       } else {
         if (!username.trim()) { alert("Kullanıcı adı gerekli!"); setAuthLoading(false); return; }
-        const { error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: username, avatar_url: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` } } });
+        const { error } = await supabase.auth.signUp({
+          email, password,
+          options: { data: { display_name: username, avatar_url: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` } }
+        });
         if (error) throw error;
-        if (avatarUrl || username) { const np = { ...userProfiles, [username]: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` }; setUserProfiles(np); localStorage.setItem("emre_board_profiles", JSON.stringify(np)); }
-        alert("Kayıt başarılı!"); setAuthMode('login'); setUsername(""); setAvatarUrl("");
+        if (avatarUrl || username) {
+          const np = { ...userProfiles, [username]: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` };
+          setUserProfiles(np);
+          localStorage.setItem("emre_board_profiles", JSON.stringify(np));
+        }
+        alert("Kayıt başarılı!");
+        setAuthMode('login'); setUsername(""); setAvatarUrl("");
       }
     } catch (err: any) { alert(err.message); } finally { setAuthLoading(false); }
   };
 
-  const handleSignOut = async () => { if (confirm("Çıkış?")) { await supabase.auth.signOut(); setSession(null); } };
+  const handleSignOut = async () => {
+    if (confirm("Çıkış?")) { await supabase.auth.signOut(); setSession(null); }
+  };
 
-  const handleAddCategory = async () => {
+  const handleAddList = async () => {
     const name = prompt("Liste adı:");
     if (name) {
-      const maxIdx = categories.length > 0 ? Math.max(...categories.map(c => c.order || 0)) : 0;
-      await supabase.from("lists").insert([{ id: `cat-${Date.now()}`, title: name.trim(), order: maxIdx + 1 }]);
+      const maxIdx = lists.length > 0 ? Math.max(...lists.map(l => l.order || 0)) : 0;
+      await supabase.from("lists").insert([{ id: `list-${Date.now()}`, title: name.trim(), order: maxIdx + 1 }]);
+      fetchAllData();
     }
   };
 
+  // ── KART YÜKLEMESİ — list_id kullan ─────────────────────────────────────
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile || !title || !megaUrl || !targetCategoryId) return alert("Eksik alan var!");
+    if (!selectedFile || !title || !megaUrl || !targetListId) return alert("Eksik alan var!");
     setLoading(true);
     try {
       const fn = `${Date.now()}-${selectedFile.name.replace(/\s/g, '-')}`;
       await supabase.storage.from("arsiv-dosyalari").upload(fn, selectedFile);
       const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
-      const cf = files.filter(f => f.category === targetCategoryId);
-      const maxIdx = cf.length > 0 ? Math.max(...cf.map(f => f.order)) : 0;
-      await supabase.from("arsiv").insert([{ title: title.toUpperCase(), mega_url: megaUrl, image_url: ud.publicUrl, category: targetCategoryId, order: maxIdx + 1 }]);
-      setShowAddModal(false); setTitle(""); setMegaUrl(""); setSelectedFile(null); fetchAllData();
+      const lc = cards.filter(c => c.list_id === targetListId);
+      const maxIdx = lc.length > 0 ? Math.max(...lc.map(c => c.order)) : 0;
+      await supabase.from("cards").insert([{
+        title: title.toUpperCase(),
+        mega_url: megaUrl,
+        image_url: ud.publicUrl,
+        list_id: targetListId,
+        order: maxIdx + 1
+      }]);
+      setShowAddModal(false); setTitle(""); setMegaUrl(""); setSelectedFile(null);
+      fetchAllData();
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!scrollContainerRef.current) return;
-    setIsDragging(true); setStartX(e.pageX - scrollContainerRef.current.offsetLeft); setScrollLeft(scrollContainerRef.current.scrollLeft);
+    setIsDragging(true);
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+    setScrollLeft(scrollContainerRef.current.scrollLeft);
   };
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !scrollContainerRef.current) return;
@@ -504,12 +587,15 @@ export default function EmreBoard() {
     return {};
   };
 
-  const getSortedCatFiles = (catId: string) =>
-    [...files.filter(f => f.category === catId)].sort((a, b) => a.order - b.order);
+  const getSortedListCards = (listId: string) =>
+    [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order - b.order);
 
-  const saveBg = (s: BackgroundSettings) => { setBackgroundSettings(s); localStorage.setItem("emre_board_bg_settings", JSON.stringify(s)); };
+  const saveBg = (s: BackgroundSettings) => {
+    setBackgroundSettings(s);
+    localStorage.setItem("emre_board_bg_settings", JSON.stringify(s));
+  };
 
-  // ── GLOW CSS ─────────────────────────────────────────────────────────────────
+  // ── GLOW CSS ──────────────────────────────────────────────────────────────
   const glowCSS = `
     @keyframes glowPulse {
       0%,100%{box-shadow:0 0 8px 2px rgba(99,102,241,.4);border-color:rgba(99,102,241,.6);}
@@ -518,7 +604,7 @@ export default function EmreBoard() {
     .glow-card{animation:glowPulse .7s ease-in-out infinite;border-width:2px!important;}
   `;
 
-  // ── LOGIN ─────────────────────────────────────────────────────────────────────
+  // ── LOGIN ──────────────────────────────────────────────────────────────────
   if (!session) return (
     <div className="h-screen bg-[#050505] flex items-center justify-center p-6 text-white relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-600/20 rounded-full blur-[120px]"/>
@@ -531,35 +617,35 @@ export default function EmreBoard() {
               <div className="w-24 h-24 rounded-full bg-zinc-800 border-2 border-dashed border-zinc-600 flex items-center justify-center overflow-hidden mb-3">
                 {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover"/> : <User size={32} className="text-zinc-500"/>}
               </div>
-              <input type="url" placeholder="Profil fotoğrafı URL" value={avatarUrl} onChange={e=>setAvatarUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-3 rounded-xl text-[10px] font-bold outline-none focus:border-blue-600 text-center"/>
+              <input type="url" placeholder="Profil fotoğrafı URL" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-3 rounded-xl text-[10px] font-bold outline-none focus:border-blue-600 text-center"/>
               <div className="flex gap-2 flex-wrap justify-center mt-3">
-                {['Felix','Aneka','Max','Luna','Shadow','Storm'].map((seed,i)=>{
-                  const url=`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
-                  return <button key={i} type="button" onClick={()=>setAvatarUrl(url)} className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all ${avatarUrl===url?'border-blue-500 scale-110':'border-transparent hover:border-zinc-500'}`}><img src={url} alt="" className="w-full h-full object-cover bg-zinc-700"/></button>;
+                {['Felix','Aneka','Max','Luna','Shadow','Storm'].map((seed, i) => {
+                  const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+                  return <button key={i} type="button" onClick={() => setAvatarUrl(url)} className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all ${avatarUrl === url ? 'border-blue-500 scale-110' : 'border-transparent hover:border-zinc-500'}`}><img src={url} alt="" className="w-full h-full object-cover bg-zinc-700"/></button>;
                 })}
               </div>
             </div>
             <div className="relative"><Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
-              <input type="text" placeholder="KULLANICI ADI" value={username} onChange={e=>setUsername(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
+              <input type="text" placeholder="KULLANICI ADI" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
           </>)}
           <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
-            <input type="email" placeholder="E-POSTA" value={email} onChange={e=>setEmail(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
+            <input type="email" placeholder="E-POSTA" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
           <div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
-            <input type="password" placeholder="ŞİFRE" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
-          <button type="submit" disabled={authLoading} className="w-full bg-blue-600 font-black py-5 rounded-2xl uppercase tracking-widest mt-4">{authLoading?"...":(authMode==='login'?'Giriş Yap':'Kayıt Ol')}</button>
+            <input type="password" placeholder="ŞİFRE" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
+          <button type="submit" disabled={authLoading} className="w-full bg-blue-600 font-black py-5 rounded-2xl uppercase tracking-widest mt-4">{authLoading ? "..." : (authMode === 'login' ? 'Giriş Yap' : 'Kayıt Ol')}</button>
         </form>
-        <button onClick={()=>setAuthMode(authMode==='login'?'signup':'login')} className="mt-8 text-zinc-500 hover:text-white text-[10px] font-black uppercase">{authMode==='login'?'Kayıt Ol':'Giriş Yap'}</button>
+        <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="mt-8 text-zinc-500 hover:text-white text-[10px] font-black uppercase">{authMode === 'login' ? 'Kayıt Ol' : 'Giriş Yap'}</button>
       </div>
     </div>
   );
 
-  // ── ANA EKRAN ─────────────────────────────────────────────────────────────────
+  // ── ANA EKRAN ──────────────────────────────────────────────────────────────
   return (
     <div className="h-screen text-white font-sans overflow-hidden flex flex-row relative"
       style={backgroundSettings.type !== 'image' ? getBackgroundStyle() : { backgroundColor: '#050505' }}>
       <style>{glowCSS}</style>
 
-      {/* ── ARKA PLAN RESMİ — cover + fixed + center ─────────────────────────── */}
+      {/* ── ARKA PLAN RESMİ — cover + fixed + center ──────────────────────── */}
       {backgroundSettings.type === 'image' && backgroundSettings.imageUrl && (<>
         <div className="fixed inset-0 z-0" style={{
           backgroundImage: `url(${backgroundSettings.imageUrl})`,
@@ -570,14 +656,14 @@ export default function EmreBoard() {
           filter: backgroundSettings.blur > 0 ? `blur(${backgroundSettings.blur}px)` : 'none',
           transform: backgroundSettings.blur > 0 ? 'scale(1.08)' : 'none',
         }}/>
-        <div className="fixed inset-0 z-0" style={{ backgroundColor: `rgba(0,0,0,${backgroundSettings.opacity/100})` }}/>
+        <div className="fixed inset-0 z-0" style={{ backgroundColor: `rgba(0,0,0,${backgroundSettings.opacity / 100})` }}/>
       </>)}
 
       {!isSidebarOpen && (
-        <button onClick={()=>setIsSidebarOpen(true)} className="fixed top-6 left-6 z-[300] p-4 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-2xl text-blue-500 shadow-2xl"><Menu/></button>
+        <button onClick={() => setIsSidebarOpen(true)} className="fixed top-6 left-6 z-[300] p-4 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-2xl text-blue-500 shadow-2xl"><Menu/></button>
       )}
 
-      {/* ── GLOBAL RANDOM DICE BUTTON (sağ-alt) ─────────────────────────────── */}
+      {/* ── GLOBAL RANDOM DICE BUTTON (sağ-alt) ────────────────────────────── */}
       <button
         onClick={pickGlobalRandom}
         className="fixed bottom-8 right-8 z-[400] w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-2xl border border-blue-400/30 hover:scale-105 active:scale-90 transition-all duration-150"
@@ -586,45 +672,45 @@ export default function EmreBoard() {
         <Dices size={26} className="text-white drop-shadow"/>
       </button>
 
-      {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
-      <div className={`fixed md:relative z-[200] h-full bg-zinc-900/95 backdrop-blur-md border-r border-white/5 flex flex-col shrink-0 transition-all duration-500 ${isSidebarOpen?'translate-x-0 w-80 p-6':'-translate-x-full w-0 p-0'}`}>
-        <div className={`transition-opacity duration-300 ${isSidebarOpen?'opacity-100':'opacity-0'} flex flex-col h-full overflow-hidden`}>
+      {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
+      <div className={`fixed md:relative z-[200] h-full bg-zinc-900/95 backdrop-blur-md border-r border-white/5 flex flex-col shrink-0 transition-all duration-500 ${isSidebarOpen ? 'translate-x-0 w-80 p-6' : '-translate-x-full w-0 p-0'}`}>
+        <div className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'} flex flex-col h-full overflow-hidden`}>
           <div className="flex items-center justify-between mb-8 min-w-[260px]">
             <h1 className="text-2xl font-black italic tracking-tighter uppercase">Emre <span className="text-blue-600">Board</span></h1>
-            <button onClick={()=>setIsSidebarOpen(false)} className="text-zinc-500"><ChevronLeft/></button>
+            <button onClick={() => setIsSidebarOpen(false)} className="text-zinc-500"><ChevronLeft/></button>
           </div>
           <div className="space-y-3 mb-8">
-            <button onClick={()=>{fetchAllData();setShowActivityPanel(true);}} className="w-full flex items-center gap-3 p-3 bg-green-600/10 text-green-500 rounded-xl border border-green-600/20 font-black uppercase italic text-[10px]"><Activity size={18}/> Aktivite</button>
-            <button onClick={()=>setShowChatPanel(true)} className="w-full flex items-center gap-3 p-3 bg-purple-600/10 text-purple-500 rounded-xl border border-purple-600/20 font-black uppercase italic text-[10px]"><MessageCircle size={18}/> Sohbet & Arkadaşlar</button>
-            <button onClick={()=>setShowSettingsPanel(true)} className="w-full flex items-center gap-3 p-3 bg-cyan-600/10 text-cyan-500 rounded-xl border border-cyan-600/20 font-black uppercase italic text-[10px]"><Settings size={18}/> Ayarlar</button>
-            <button onClick={toggleAdminPower} className={`w-full flex items-center gap-3 p-3 rounded-xl border font-black uppercase italic text-[10px] ${isAdmin?'bg-orange-600/20 text-orange-500 border-orange-600/40':'bg-white/5 text-zinc-500 border-white/10'}`}><ShieldAlert size={18}/> Admin: {isAdmin?'AÇIK':'KAPALI'}</button>
+            <button onClick={() => { fetchAllData(); setShowActivityPanel(true); }} className="w-full flex items-center gap-3 p-3 bg-green-600/10 text-green-500 rounded-xl border border-green-600/20 font-black uppercase italic text-[10px]"><Activity size={18}/> Aktivite</button>
+            <button onClick={() => setShowChatPanel(true)} className="w-full flex items-center gap-3 p-3 bg-purple-600/10 text-purple-500 rounded-xl border border-purple-600/20 font-black uppercase italic text-[10px]"><MessageCircle size={18}/> Sohbet & Arkadaşlar</button>
+            <button onClick={() => setShowSettingsPanel(true)} className="w-full flex items-center gap-3 p-3 bg-cyan-600/10 text-cyan-500 rounded-xl border border-cyan-600/20 font-black uppercase italic text-[10px]"><Settings size={18}/> Ayarlar</button>
+            <button onClick={toggleAdminPower} className={`w-full flex items-center gap-3 p-3 rounded-xl border font-black uppercase italic text-[10px] ${isAdmin ? 'bg-orange-600/20 text-orange-500 border-orange-600/40' : 'bg-white/5 text-zinc-500 border-white/10'}`}><ShieldAlert size={18}/> Admin: {isAdmin ? 'AÇIK' : 'KAPALI'}</button>
           </div>
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
               <span className="text-[10px] font-black uppercase italic text-zinc-400 flex items-center gap-2"><BarChart3 size={14}/> En Popüler</span>
-              {isAdmin && <button onClick={()=>setShowStatsDetail(true)} className="text-[8px] font-black bg-blue-600/20 text-blue-500 px-2 py-1 rounded-md">Detaylar</button>}
+              {isAdmin && <button onClick={() => setShowStatsDetail(true)} className="text-[8px] font-black bg-blue-600/20 text-blue-500 px-2 py-1 rounded-md">Detaylar</button>}
             </div>
             <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar-v">
-              {getStats().slice(0,10).map((stat:any,idx)=>(
+              {getStats().slice(0, 10).map((stat: any, idx) => (
                 <div key={idx} className="bg-black/30 border border-white/5 rounded-xl p-2 group relative">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0"><img src={stat.image_url} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" alt=""/></div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[9px] font-black uppercase italic truncate">{stat.title}</p>
-                      {isAdmin&&<p className="text-[8px] font-bold text-zinc-500">{stat.totalClicks} TIK</p>}
+                      {isAdmin && <p className="text-[8px] font-bold text-zinc-500">{stat.totalClicks} TIK</p>}
                     </div>
-                    {isAdmin&&<button onClick={()=>deleteStatLogs(stat.id)} className="p-1 text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12}/></button>}
+                    {isAdmin && <button onClick={() => deleteStatLogs(stat.id)} className="p-1 text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12}/></button>}
                   </div>
                 </div>
               ))}
             </div>
           </div>
           <div className="mt-6 space-y-3 pt-4 border-t border-white/5">
-            <button onClick={handleAddCategory} className="w-full flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5 uppercase text-[10px] font-black hover:bg-blue-600/10"><Plus size={18}/> Liste Ekle</button>
+            <button onClick={handleAddList} className="w-full flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5 uppercase text-[10px] font-black hover:bg-blue-600/10"><Plus size={18}/> Liste Ekle</button>
             <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-black italic text-[10px] overflow-hidden">
-                  {userProfiles[currentUserName]?<img src={userProfiles[currentUserName]} className="w-full h-full object-cover" alt=""/>:currentUserName[0]}
+                  {userProfiles[currentUserName] ? <img src={userProfiles[currentUserName]} className="w-full h-full object-cover" alt=""/> : currentUserName[0]}
                 </div>
                 <p className="text-[10px] font-black uppercase italic truncate">{currentUserName}</p>
               </div>
@@ -634,115 +720,124 @@ export default function EmreBoard() {
         </div>
       </div>
 
-      {/* ── BOARD ────────────────────────────────────────────────────────────── */}
-      <div ref={scrollContainerRef} onMouseDown={handleMouseDown} onMouseLeave={()=>setIsDragging(false)} onMouseUp={()=>setIsDragging(false)} onMouseMove={handleMouseMove}
-        className={`flex-1 overflow-x-auto custom-scrollbar flex items-start p-6 md:p-10 gap-6 md:gap-8 h-full transition-all duration-500 relative z-10 ${!isSidebarOpen?'md:pl-24':''} ${isDragging?'cursor-grabbing select-none':'cursor-default'}`}>
-        {categories.map((cat,catIdx)=>{
-          const catFiles = getSortedCatFiles(cat.id);
+      {/* ── BOARD ───────────────────────────────────────────────────────────── */}
+      <div
+        ref={scrollContainerRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={() => setIsDragging(false)}
+        onMouseUp={() => setIsDragging(false)}
+        onMouseMove={handleMouseMove}
+        className={`flex-1 overflow-x-auto custom-scrollbar flex items-start p-6 md:p-10 gap-6 md:gap-8 h-full transition-all duration-500 relative z-10 ${!isSidebarOpen ? 'md:pl-24' : ''} ${isDragging ? 'cursor-grabbing select-none' : 'cursor-default'}`}
+      >
+        {lists.map((list, listIdx) => {
+          const listCards = getSortedListCards(list.id);
           return (
-            <div key={cat.id} className="w-[260px] md:w-[340px] shrink-0 bg-zinc-900/70 backdrop-blur-md border border-white/5 rounded-[2.5rem] flex flex-col max-h-[85vh] relative shadow-2xl">
+            <div key={list.id} className="w-[260px] md:w-[340px] shrink-0 bg-zinc-900/70 backdrop-blur-md border border-white/5 rounded-[2.5rem] flex flex-col max-h-[85vh] relative shadow-2xl">
               <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
                 <div className="flex items-center gap-0.5">
-                  <button onClick={()=>moveCategory(catIdx,'left')} disabled={catIdx===0}
+                  <button onClick={() => moveList(listIdx, 'left')} disabled={listIdx === 0}
                     className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
                     <ChevronLeft size={14}/>
                   </button>
-                  <button onClick={()=>moveCategory(catIdx,'right')} disabled={catIdx===categories.length-1}
+                  <button onClick={() => moveList(listIdx, 'right')} disabled={listIdx === lists.length - 1}
                     className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
                     <ChevronRight size={14}/>
                   </button>
                 </div>
-                <h2 className="font-black text-[10px] md:text-[12px] uppercase tracking-widest text-blue-500 italic flex-1 text-center px-1">{cat.name}</h2>
+                <h2 className="font-black text-[10px] md:text-[12px] uppercase tracking-widest text-blue-500 italic flex-1 text-center px-1">{list.title}</h2>
                 <div className="flex items-center gap-0.5">
-                  {isAdmin&&<>
-                    <button onClick={()=>handleCategoryRename(cat.id,cat.name)} className="p-1.5 text-blue-500/50 hover:text-blue-500 transition-all"><Edit3 size={14}/></button>
-                    <button onClick={()=>deleteCategory(cat.id)} className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
+                  {isAdmin && <>
+                    <button onClick={() => handleListRename(list.id, list.title)} className="p-1.5 text-blue-500/50 hover:text-blue-500 transition-all"><Edit3 size={14}/></button>
+                    <button onClick={() => deleteList(list.id)} className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
                   </>}
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
-                {catFiles.map((file,idx)=>(
-                  <div id={`card-${file.id}`} key={file.id}
-                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowCardId===file.id?'glow-card border-indigo-400':'border-white/5 hover:border-blue-600/40'}`}>
-                    {isAdmin&&<button onClick={()=>startEditing(file)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
-                    <button onClick={()=>{setChangeCatTarget(file);setShowChangeCatModal(true);}}
+                {listCards.map((card, idx) => (
+                  <div
+                    id={`card-${card.id}`}
+                    key={card.id}
+                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowCardId === card.id ? 'glow-card border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
+                  >
+                    {isAdmin && <button onClick={() => startEditing(card)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
+                    <button onClick={() => { setChangeCatTarget(card); setShowChangeCatModal(true); }}
                       className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
                       <ArrowLeftRight size={14}/>
                     </button>
                     <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={()=>moveItem(idx,'up',cat.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
-                      <button onClick={()=>moveItem(idx,'down',cat.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
+                      <button onClick={() => moveCard(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
+                      <button onClick={() => moveCard(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
                     </div>
-                    <button onClick={()=>handleCardClick(file)} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
-                      <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+                    <button onClick={() => handleCardClick(card)} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
+                      <img src={card.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
                     </button>
                     <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-                      <span className="truncate pr-2">{file.title}</span>
-                      {isAdmin&&<button onClick={()=>deleteFile(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
+                      <span className="truncate pr-2">{card.title}</span>
+                      {isAdmin && <button onClick={() => deleteCard(card.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
                     </div>
                   </div>
                 ))}
-                <button onClick={()=>{setTargetCategoryId(cat.id);setShowAddModal(true);}} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
+                <button onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* ── LİSTE DEĞİŞTİR ───────────────────────────────────────────────────── */}
-      {showChangeCatModal&&changeCatTarget&&(
+      {/* ── LİSTE DEĞİŞTİR ──────────────────────────────────────────────────── */}
+      {showChangeCatModal && changeCatTarget && (
         <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-sm bg-zinc-900 border border-purple-600/30 p-8 rounded-[3rem] shadow-4xl">
             <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3"><ArrowLeftRight size={22}/> Liste Değiştir</h2>
             <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">"{changeCatTarget.title}" kartını taşı</p>
             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
-              {categories.filter(c=>c.id!==changeCatTarget.category).map(cat=>(
-                <button key={cat.id} onClick={()=>handleChangeCategory(cat.id)}
-                  className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all">{cat.name}</button>
+              {lists.filter(l => l.id !== changeCatTarget.list_id).map(list => (
+                <button key={list.id} onClick={() => handleChangeList(list.id)}
+                  className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all">{list.title}</button>
               ))}
             </div>
-            <button onClick={()=>{setShowChangeCatModal(false);setChangeCatTarget(null);}} className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase">İptal</button>
+            <button onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }} className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase">İptal</button>
           </div>
         </div>
       )}
 
-      {/* ── AKTİVİTE PANELİ ──────────────────────────────────────────────────── */}
-      {showActivityPanel&&(
+      {/* ── AKTİVİTE PANELİ ─────────────────────────────────────────────────── */}
+      {showActivityPanel && (
         <div className="fixed inset-0 z-[600] bg-[#050505] flex flex-col overflow-hidden">
           <div className="p-8 border-b border-white/5 flex flex-col gap-4 bg-zinc-900/50">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
-                {(selectedUser||searchedUserData)&&<button onClick={()=>{setSelectedUser(null);setSearchedUserData(null);setUserSearchQuery("");}} className="p-2 bg-white/5 rounded-lg text-zinc-400"><ChevronLeft size={20}/></button>}
-                <h2 className="text-3xl font-black uppercase italic">{searchedUserData?`${searchedUserData.user} - Profil`:selectedUser?`${selectedUser} - Aktiviteler`:'Kullanıcı Listesi'}</h2>
+                {(selectedUser || searchedUserData) && <button onClick={() => { setSelectedUser(null); setSearchedUserData(null); setUserSearchQuery(""); }} className="p-2 bg-white/5 rounded-lg text-zinc-400"><ChevronLeft size={20}/></button>}
+                <h2 className="text-3xl font-black uppercase italic">{searchedUserData ? `${searchedUserData.user} - Profil` : selectedUser ? `${selectedUser} - Aktiviteler` : 'Kullanıcı Listesi'}</h2>
               </div>
-              <button onClick={()=>{setShowActivityPanel(false);setSelectedUser(null);setSearchedUserData(null);setUserSearchQuery("");}} className="p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600 transition-all"><X size={24}/></button>
+              <button onClick={() => { setShowActivityPanel(false); setSelectedUser(null); setSearchedUserData(null); setUserSearchQuery(""); }} className="p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600 transition-all"><X size={24}/></button>
             </div>
-            {!selectedUser&&!searchedUserData&&(
+            {!selectedUser && !searchedUserData && (
               <div className="flex gap-3">
                 <div className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
-                  <input type="text" value={userSearchQuery} onChange={e=>setUserSearchQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleUserSearch()} placeholder="Kullanıcı ara..." className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-green-600"/></div>
+                  <input type="text" value={userSearchQuery} onChange={e => setUserSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleUserSearch()} placeholder="Kullanıcı ara..." className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-green-600"/></div>
                 <button onClick={handleUserSearch} className="px-6 bg-green-600 rounded-2xl font-black text-[10px] uppercase hover:bg-green-500 transition-all">Ara</button>
               </div>
             )}
           </div>
           <div className="flex-1 overflow-y-auto p-8 custom-scrollbar-v">
-            {searchedUserData&&(
+            {searchedUserData && (
               <div className="max-w-4xl mx-auto space-y-8">
                 <div className="bg-zinc-900/60 border border-white/10 rounded-[2rem] p-8 flex items-center gap-6">
                   <div className="relative">
                     <div className="w-24 h-24 bg-zinc-800 rounded-2xl flex items-center justify-center font-black italic text-4xl overflow-hidden">
-                      {userProfiles[searchedUserData.user]?<img src={userProfiles[searchedUserData.user]} className="w-full h-full object-cover" alt=""/>:searchedUserData.user[0].toUpperCase()}
+                      {userProfiles[searchedUserData.user] ? <img src={userProfiles[searchedUserData.user]} className="w-full h-full object-cover" alt=""/> : searchedUserData.user[0].toUpperCase()}
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-zinc-900 ${isUserOnline(searchedUserData.user)?'bg-green-500':'bg-zinc-500'}`}/>
+                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-zinc-900 ${isUserOnline(searchedUserData.user) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
                   </div>
                   <div>
                     <h3 className="text-2xl font-black uppercase italic">{searchedUserData.user}</h3>
-                    <p className={`text-sm font-bold ${isUserOnline(searchedUserData.user)?'text-green-400':'text-zinc-500'}`}>{getLastSeen(searchedUserData.user)}</p>
-                    <p className="text-xs text-zinc-600 mt-2">{searchedUserData.logs.length} aktivite | {searchedUserData.files.length} dosya tıklamış</p>
+                    <p className={`text-sm font-bold ${isUserOnline(searchedUserData.user) ? 'text-green-400' : 'text-zinc-500'}`}>{getLastSeen(searchedUserData.user)}</p>
+                    <p className="text-xs text-zinc-600 mt-2">{searchedUserData.logs.length} aktivite | {searchedUserData.cards.length} kart tıklamış</p>
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {searchedUserData.logs.slice(0,10).map(log=>(
+                  {searchedUserData.logs.slice(0, 10).map(log => (
                     <div key={log.id} className="flex items-center p-4 bg-zinc-900/80 border border-white/5 rounded-2xl gap-4">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/40 p-1"><img src={log.image_url} className="w-full h-full object-contain" alt=""/></div>
                       <div><p className="font-black italic uppercase text-sm">{log.title}</p><p className="text-[9px] text-zinc-500 font-bold">{new Date(log.created_at).toLocaleString('tr-TR')}</p></div>
@@ -751,22 +846,22 @@ export default function EmreBoard() {
                 </div>
               </div>
             )}
-            {!selectedUser&&!searchedUserData&&(
+            {!selectedUser && !searchedUserData && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {getVisibleUsers().map(uName=>(
+                {getVisibleUsers().map(uName => (
                   <div key={uName} className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 aspect-[4/3] flex flex-col items-center justify-center transition-all hover:border-blue-600/50 shadow-2xl">
-                    {userProfiles[uName]&&<img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt=""/>}
-                    <label className="absolute top-4 right-4 p-2 bg-black/60 rounded-xl text-blue-500 opacity-0 group-hover:opacity-100 cursor-pointer z-20"><ImageIcon size={16}/><input type="file" accept="image/*" className="hidden" onChange={e=>handleUserPhotoUpload(uName,e)}/></label>
-                    <div className={`absolute top-4 left-4 px-2 py-1 rounded-full text-[8px] font-black uppercase ${isUserOnline(uName)?'bg-green-600 text-white':'bg-zinc-700 text-zinc-400'}`}>{isUserOnline(uName)?'Çevrimiçi':'Çevrimdışı'}</div>
+                    {userProfiles[uName] && <img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt=""/>}
+                    <label className="absolute top-4 right-4 p-2 bg-black/60 rounded-xl text-blue-500 opacity-0 group-hover:opacity-100 cursor-pointer z-20"><ImageIcon size={16}/><input type="file" accept="image/*" className="hidden" onChange={e => handleUserPhotoUpload(uName, e)}/></label>
+                    <div className={`absolute top-4 left-4 px-2 py-1 rounded-full text-[8px] font-black uppercase ${isUserOnline(uName) ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400'}`}>{isUserOnline(uName) ? 'Çevrimiçi' : 'Çevrimdışı'}</div>
                     <User className="mb-4 text-blue-500 relative z-10" size={48}/>
-                    <button onClick={()=>setSelectedUser(uName)} className="relative z-10 font-black uppercase italic text-lg tracking-wider hover:text-blue-400">{uName}</button>
+                    <button onClick={() => setSelectedUser(uName)} className="relative z-10 font-black uppercase italic text-lg tracking-wider hover:text-blue-400">{uName}</button>
                   </div>
                 ))}
               </div>
             )}
-            {selectedUser&&!searchedUserData&&(
+            {selectedUser && !searchedUserData && (
               <div className="max-w-4xl mx-auto space-y-4">
-                {logs.filter(l=>l.user_name===selectedUser).map(log=>(
+                {logs.filter(l => l.user_name === selectedUser).map(log => (
                   <div key={log.id} className="flex items-center p-5 bg-zinc-900/80 border border-white/10 rounded-[1.5rem] group hover:bg-blue-600/5 transition-all gap-5">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden bg-black/40 p-1"><img src={log.image_url} className="w-full h-full object-contain" alt=""/></div>
                     <div><p className="font-black italic uppercase text-lg group-hover:text-blue-400">{log.title}</p><p className="text-[10px] text-zinc-500 font-bold uppercase">{new Date(log.created_at).toLocaleString('tr-TR')}</p></div>
@@ -778,42 +873,42 @@ export default function EmreBoard() {
         </div>
       )}
 
-      {/* ── SOHBET ───────────────────────────────────────────────────────────── */}
-      {showChatPanel&&(
+      {/* ── SOHBET ──────────────────────────────────────────────────────────── */}
+      {showChatPanel && (
         <div className="fixed inset-0 z-[700] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-6xl h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-row shadow-4xl relative">
             <div className="w-80 border-r border-white/5 flex flex-col bg-zinc-900/30">
               <div className="p-6 border-b border-white/5 flex items-center justify-between">
                 <h3 className="font-black uppercase italic text-sm text-blue-500">Arkadaşlar</h3>
-                <button onClick={()=>setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 transition-all"><UserPlus size={18}/></button>
+                <button onClick={() => setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 transition-all"><UserPlus size={18}/></button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                <div onClick={()=>setActiveChatFriend(ADMIN_NAME)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend===ADMIN_NAME?'bg-blue-600 border-blue-400 shadow-lg':'bg-blue-600/10 border-blue-600/20'}`}>
+                <div onClick={() => setActiveChatFriend(ADMIN_NAME)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === ADMIN_NAME ? 'bg-blue-600 border-blue-400 shadow-lg' : 'bg-blue-600/10 border-blue-600/20'}`}>
                   <div className="relative">
                     <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center font-black overflow-hidden">
-                      {userProfiles[ADMIN_NAME]?<img src={userProfiles[ADMIN_NAME]} className="w-full h-full object-cover" alt=""/>:"E"}
+                      {userProfiles[ADMIN_NAME] ? <img src={userProfiles[ADMIN_NAME]} className="w-full h-full object-cover" alt=""/> : "E"}
                     </div>
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(ADMIN_NAME)?'bg-green-500':'bg-zinc-500'}`}/>
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(ADMIN_NAME) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
                   </div>
                   <div className="flex-1">
                     <p className="text-xs font-black uppercase italic">Emre (Admin)</p>
-                    <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(ADMIN_NAME)?'text-green-400':'text-white/50'}`}>
-                      {isUserOnline(ADMIN_NAME)?<span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/>:<Clock size={8}/>} {getLastSeen(ADMIN_NAME)}
+                    <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(ADMIN_NAME) ? 'text-green-400' : 'text-white/50'}`}>
+                      {isUserOnline(ADMIN_NAME) ? <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/> : <Clock size={8}/>} {getLastSeen(ADMIN_NAME)}
                     </p>
                   </div>
                 </div>
-                {friends.map((fName,i)=>(
-                  <div key={i} onClick={()=>setActiveChatFriend(fName)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend===fName?'bg-zinc-700 border-zinc-500 shadow-lg':'bg-white/5 border-white/5 hover:bg-white/10'}`}>
+                {friends.map((fName, i) => (
+                  <div key={i} onClick={() => setActiveChatFriend(fName)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === fName ? 'bg-zinc-700 border-zinc-500 shadow-lg' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
                     <div className="relative">
                       <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center font-black italic overflow-hidden">
-                        {userProfiles[fName]?<img src={userProfiles[fName]} className="w-full h-full object-cover" alt=""/>:fName[0].toUpperCase()}
+                        {userProfiles[fName] ? <img src={userProfiles[fName]} className="w-full h-full object-cover" alt=""/> : fName[0].toUpperCase()}
                       </div>
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(fName)?'bg-green-500':'bg-zinc-500'}`}/>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(fName) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
                     </div>
                     <div className="flex-1">
                       <p className="text-xs font-black uppercase italic">{fName}</p>
-                      <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(fName)?'text-green-400':'text-zinc-500'}`}>
-                        {isUserOnline(fName)?<span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/>:<Clock size={8}/>} {getLastSeen(fName)}
+                      <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(fName) ? 'text-green-400' : 'text-zinc-500'}`}>
+                        {isUserOnline(fName) ? <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/> : <Clock size={8}/>} {getLastSeen(fName)}
                       </p>
                     </div>
                   </div>
@@ -821,54 +916,53 @@ export default function EmreBoard() {
               </div>
             </div>
             <div className="flex-1 flex flex-col relative bg-black/20">
-              {activeChatFriend?(
+              {activeChatFriend ? (
                 <>
                   <div className="p-6 border-b border-white/5 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center font-black overflow-hidden">
-                        {userProfiles[activeChatFriend]?<img src={userProfiles[activeChatFriend]} className="w-full h-full object-cover" alt=""/>:activeChatFriend[0].toUpperCase()}
+                        {userProfiles[activeChatFriend] ? <img src={userProfiles[activeChatFriend]} className="w-full h-full object-cover" alt=""/> : activeChatFriend[0].toUpperCase()}
                       </div>
                       <div>
                         <h4 className="font-black uppercase italic">{activeChatFriend}</h4>
-                        <p className={`text-[9px] font-bold ${isUserOnline(activeChatFriend)?'text-green-400':'text-zinc-500'}`}>{getLastSeen(activeChatFriend)}</p>
+                        <p className={`text-[9px] font-bold ${isUserOnline(activeChatFriend) ? 'text-green-400' : 'text-zinc-500'}`}>{getLastSeen(activeChatFriend)}</p>
                       </div>
                     </div>
-                    <button onClick={()=>setShowChatPanel(false)} className="p-2 text-zinc-500 hover:text-white"><X/></button>
+                    <button onClick={() => setShowChatPanel(false)} className="p-2 text-zinc-500 hover:text-white"><X/></button>
                   </div>
                   <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar-v">
-                    {messages.map((msg,i)=>{
-                      const isMe = msg.sender_name===currentUserName;
+                    {messages.map((msg, i) => {
+                      const isMe = msg.sender_name === currentUserName;
                       return (
-                        <div key={i} className={`flex ${isMe?'justify-end':'justify-start'}`}>
-                          <div className={`max-w-[70%] p-4 rounded-2xl ${isMe?'bg-blue-600 text-white rounded-tr-none':'bg-zinc-800 text-zinc-200 rounded-tl-none'}`}>
+                        <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[70%] p-4 rounded-2xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-zinc-800 text-zinc-200 rounded-tl-none'}`}>
                             <p className="text-sm font-medium">{msg.text}</p>
-                            <p className="text-[8px] text-white/30 text-right mt-1">{msg.created_at?new Date(msg.created_at).toLocaleTimeString():""}</p>
+                            <p className="text-[8px] text-white/30 text-right mt-1">{msg.created_at ? new Date(msg.created_at).toLocaleTimeString() : ""}</p>
                           </div>
                         </div>
                       );
                     })}
                     <div ref={chatEndRef}/>
                   </div>
-                  {/* SADELEŞTİRİLMİŞ mesaj kutusu — sadece text input + gönder */}
                   <form onSubmit={handleSendMessage} className="p-6 border-t border-white/5 flex gap-4 bg-zinc-900/30">
-                    <input type="text" value={newMessage} onChange={e=>setNewMessage(e.target.value)} placeholder={`${activeChatFriend} kişisine mesaj yaz...`} className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:border-blue-600"/>
+                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={`${activeChatFriend} kişisine mesaj yaz...`} className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:border-blue-600"/>
                     <button type="submit" className="p-4 bg-blue-600 rounded-2xl hover:bg-blue-500 transition-all"><Send size={18}/></button>
                   </form>
                 </>
-              ):(
+              ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 uppercase italic font-black">
                   <MessageCircle size={64} className="mb-4 opacity-20"/><p>Mesajlaşmak için bir arkadaş seç</p>
                 </div>
               )}
             </div>
-            {showAddFriendModal&&(
+            {showAddFriendModal && (
               <div className="absolute inset-0 z-[800] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
                 <div className="w-full max-w-sm bg-zinc-900 border border-white/10 p-8 rounded-[2rem] text-center">
                   <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadaş Ara</h3>
                   <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTİF KULLANICILAR EKLENEBİLİR</p>
-                  <input type="text" value={searchFriendName} onChange={e=>setSearchFriendName(e.target.value)} placeholder="Tam kullanıcı adı..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6"/>
+                  <input type="text" value={searchFriendName} onChange={e => setSearchFriendName(e.target.value)} placeholder="Tam kullanıcı adı..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6"/>
                   <div className="flex gap-4">
-                    <button onClick={()=>setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
+                    <button onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
                     <button onClick={handleAddFriend} className="flex-1 p-3 bg-blue-600 rounded-xl text-[10px] font-black uppercase">Ekle</button>
                   </div>
                 </div>
@@ -878,16 +972,16 @@ export default function EmreBoard() {
         </div>
       )}
 
-      {/* ── STATS ────────────────────────────────────────────────────────────── */}
-      {showStatsDetail&&isAdmin&&(
+      {/* ── STATS ───────────────────────────────────────────────────────────── */}
+      {showStatsDetail && isAdmin && (
         <div className="fixed inset-0 z-[900] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-4xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col h-[85vh]">
             <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-blue-600/10 to-transparent">
               <h2 className="text-2xl font-black uppercase italic text-blue-500">Analiz & Tıklama Geçmişi</h2>
-              <button onClick={()=>setShowStatsDetail(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
+              <button onClick={() => setShowStatsDetail(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar-v">
-              {getStats().map((stat:any,idx)=>(
+              {getStats().map((stat: any, idx) => (
                 <div key={idx} className="bg-zinc-900/40 border border-white/5 rounded-[2rem] p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -897,7 +991,7 @@ export default function EmreBoard() {
                     <a href={stat.mega_url} target="_blank" rel="noreferrer" className="p-4 bg-blue-600/10 text-blue-500 rounded-2xl hover:bg-blue-600 transition-all flex items-center gap-2 font-black text-[10px] uppercase"><ExternalLink size={16}/> Git</a>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(stat.users).map(([uName,data]:any)=>(
+                    {Object.entries(stat.users).map(([uName, data]: any) => (
                       <div key={uName} className="p-3 bg-black/40 border border-white/5 rounded-xl">
                         <p className="text-[10px] font-black uppercase italic">{uName}</p>
                         <div className="flex justify-between mt-1">
@@ -914,81 +1008,81 @@ export default function EmreBoard() {
         </div>
       )}
 
-      {/* ── DÜZENLEME MODAL ──────────────────────────────────────────────────── */}
-      {showEditModal&&editingItem&&(
+      {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
+      {showEditModal && editingCard && (
         <div className="fixed inset-0 z-[1100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-lg bg-zinc-900 border border-blue-600/30 p-8 rounded-[3rem] shadow-4xl">
             <h2 className="text-2xl font-black italic uppercase mb-6 text-blue-500 flex items-center gap-3"><Edit3/> Düzenle</h2>
             <form onSubmit={handleUpdate} className="space-y-4">
-              <input type="text" value={editTitle} onChange={e=>setEditTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600" placeholder="BAŞLIK"/>
-              <input type="text" value={editMegaUrl} onChange={e=>setEditMegaUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600" placeholder="MEGA URL"/>
+              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600" placeholder="BAŞLIK"/>
+              <input type="text" value={editMegaUrl} onChange={e => setEditMegaUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600" placeholder="MEGA URL"/>
               <div>
                 <label className="text-[9px] font-bold text-zinc-500 uppercase mb-1 block">Liste</label>
-                <select value={editCategory} onChange={e=>setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600">
-                  {categories.map(cat=><option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                <select value={editListId} onChange={e => setEditListId(e.target.value)} className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600">
+                  {lists.map(list => <option key={list.id} value={list.id}>{list.title}</option>)}
                 </select>
               </div>
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <img src={editFile?URL.createObjectURL(editFile):editingItem.image_url} className="w-20 h-20 object-contain rounded-xl border border-white/10" alt=""/>
+                  <img src={editFile ? URL.createObjectURL(editFile) : editingCard.image_url} className="w-20 h-20 object-contain rounded-xl border border-white/10" alt=""/>
                   <div className="flex-1">
                     <p className="text-[9px] font-bold text-zinc-500 uppercase mb-1">Görsel Değiştir</p>
                     <p className="text-[9px] font-bold text-blue-400 mb-2">💡 Ctrl+V ile yapıştır</p>
-                    <input type="file" accept="image/*" onChange={e=>setEditFile(e.target.files?.[0]||null)} className="w-full text-xs text-zinc-400"/>
+                    <input type="file" accept="image/*" onChange={e => setEditFile(e.target.files?.[0] || null)} className="w-full text-xs text-zinc-400"/>
                   </div>
                 </div>
-                {editFile&&(
+                {editFile && (
                   <div className="flex items-center gap-2 p-2 bg-green-600/10 border border-green-600/20 rounded-xl">
                     <div className="w-2 h-2 bg-green-500 rounded-full"/>
                     <p className="text-[9px] font-bold text-green-400">{editFile.name} seçildi</p>
-                    <button type="button" onClick={()=>setEditFile(null)} className="ml-auto text-zinc-500 hover:text-red-400"><X size={12}/></button>
+                    <button type="button" onClick={() => setEditFile(null)} className="ml-auto text-zinc-500 hover:text-red-400"><X size={12}/></button>
                   </div>
                 )}
               </div>
               <div className="flex gap-4 mt-6">
-                <button type="button" onClick={()=>setShowEditModal(false)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">İPTAL</button>
-                <button type="submit" disabled={loading} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">{loading?"...":"GÜNCELLE"}</button>
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">İPTAL</button>
+                <button type="submit" disabled={loading} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">{loading ? "..." : "GÜNCELLE"}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ── KART EKLEME ──────────────────────────────────────────────────────── */}
-      {showAddModal&&(
+      {/* ── KART EKLEME ─────────────────────────────────────────────────────── */}
+      {showAddModal && (
         <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-lg bg-zinc-900 border border-white/10 p-8 rounded-[3rem]">
             <h2 className="text-2xl font-black italic uppercase mb-6 text-blue-500">Yeni Kart Ekle</h2>
             <form onSubmit={handleUpload} className="space-y-4">
-              <input type="text" placeholder="BAŞLIK" value={title} onChange={e=>setTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600"/>
-              <input type="text" placeholder="MEGA URL" value={megaUrl} onChange={e=>setMegaUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600"/>
+              <input type="text" placeholder="BAŞLIK" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600"/>
+              <input type="text" placeholder="MEGA URL" value={megaUrl} onChange={e => setMegaUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600"/>
               <div>
                 <p className="text-[9px] font-bold text-blue-400 mb-2">💡 Ctrl+V ile panodan görsel yapıştır</p>
-                <input type="file" accept="image/*" onChange={e=>setSelectedFile(e.target.files?.[0]||null)} className="w-full text-xs text-zinc-400"/>
-                {selectedFile&&(
+                <input type="file" accept="image/*" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="w-full text-xs text-zinc-400"/>
+                {selectedFile && (
                   <div className="mt-2 flex items-center gap-3 p-2 bg-green-600/10 border border-green-600/20 rounded-xl">
                     <img src={URL.createObjectURL(selectedFile)} alt="" className="w-12 h-12 object-cover rounded-lg"/>
-                    <div className="flex-1"><p className="text-[9px] font-bold text-green-400">{selectedFile.name}</p><p className="text-[8px] text-zinc-500">{(selectedFile.size/1024).toFixed(1)} KB</p></div>
-                    <button type="button" onClick={()=>setSelectedFile(null)} className="text-zinc-500 hover:text-red-400"><X size={14}/></button>
+                    <div className="flex-1"><p className="text-[9px] font-bold text-green-400">{selectedFile.name}</p><p className="text-[8px] text-zinc-500">{(selectedFile.size / 1024).toFixed(1)} KB</p></div>
+                    <button type="button" onClick={() => setSelectedFile(null)} className="text-zinc-500 hover:text-red-400"><X size={14}/></button>
                   </div>
                 )}
               </div>
               <div className="flex gap-4 mt-6">
-                <button type="button" onClick={()=>{setShowAddModal(false);setSelectedFile(null);}} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">İPTAL</button>
-                <button type="submit" disabled={loading} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">{loading?"...":"KAYDET"}</button>
+                <button type="button" onClick={() => { setShowAddModal(false); setSelectedFile(null); }} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">İPTAL</button>
+                <button type="submit" disabled={loading} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">{loading ? "..." : "KAYDET"}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ── AYARLAR ──────────────────────────────────────────────────────────── */}
-      {showSettingsPanel&&(
+      {/* ── AYARLAR ─────────────────────────────────────────────────────────── */}
+      {showSettingsPanel && (
         <div className="fixed inset-0 z-[750] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col max-h-[90vh] shadow-4xl">
             <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-cyan-600/10 to-transparent">
               <h2 className="text-2xl font-black uppercase italic text-cyan-500 flex items-center gap-3"><Settings size={28}/> Ayarlar</h2>
-              <button onClick={()=>setShowSettingsPanel(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
+              <button onClick={() => setShowSettingsPanel(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar-v">
               {/* Profil */}
@@ -997,28 +1091,28 @@ export default function EmreBoard() {
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
                   <div className="flex items-center gap-4 mb-2">
                     <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center overflow-hidden font-black text-2xl">
-                      {userProfiles[currentUserName]?<img src={userProfiles[currentUserName]} className="w-full h-full object-cover" alt=""/>:currentUserName[0]}
+                      {userProfiles[currentUserName] ? <img src={userProfiles[currentUserName]} className="w-full h-full object-cover" alt=""/> : currentUserName[0]}
                     </div>
                     <div><p className="font-black uppercase italic text-sm">{currentUserName}</p><p className="text-[9px] text-zinc-500">Mevcut profil</p></div>
                   </div>
-                  {showProfileEdit?(
+                  {showProfileEdit ? (
                     <div className="space-y-3">
-                      <input type="text" value={newDisplayName} onChange={e=>setNewDisplayName(e.target.value)} placeholder={currentUserName} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-bold outline-none focus:border-cyan-600"/>
-                      <input type="file" accept="image/*" onChange={e=>setNewProfileFile(e.target.files?.[0]||null)} className="w-full text-xs text-zinc-400"/>
-                      {newProfileFile&&(
+                      <input type="text" value={newDisplayName} onChange={e => setNewDisplayName(e.target.value)} placeholder={currentUserName} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-bold outline-none focus:border-cyan-600"/>
+                      <input type="file" accept="image/*" onChange={e => setNewProfileFile(e.target.files?.[0] || null)} className="w-full text-xs text-zinc-400"/>
+                      {newProfileFile && (
                         <div className="flex items-center gap-2 p-2 bg-cyan-600/10 border border-cyan-600/20 rounded-xl">
                           <img src={URL.createObjectURL(newProfileFile)} alt="" className="w-10 h-10 object-cover rounded-lg"/>
                           <p className="text-[9px] font-bold text-cyan-400 truncate flex-1">{newProfileFile.name}</p>
-                          <button type="button" onClick={()=>setNewProfileFile(null)} className="text-zinc-500 hover:text-red-400"><X size={12}/></button>
+                          <button type="button" onClick={() => setNewProfileFile(null)} className="text-zinc-500 hover:text-red-400"><X size={12}/></button>
                         </div>
                       )}
                       <div className="flex gap-3">
-                        <button onClick={()=>{setShowProfileEdit(false);setNewDisplayName("");setNewProfileFile(null);}} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
-                        <button onClick={handleProfileUpdate} disabled={profileLoading} className="flex-1 p-3 bg-cyan-600 rounded-xl text-[10px] font-black uppercase disabled:opacity-50">{profileLoading?"...":"Kaydet"}</button>
+                        <button onClick={() => { setShowProfileEdit(false); setNewDisplayName(""); setNewProfileFile(null); }} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
+                        <button onClick={handleProfileUpdate} disabled={profileLoading} className="flex-1 p-3 bg-cyan-600 rounded-xl text-[10px] font-black uppercase disabled:opacity-50">{profileLoading ? "..." : "Kaydet"}</button>
                       </div>
                     </div>
-                  ):(
-                    <button onClick={()=>setShowProfileEdit(true)} className="w-full p-3 bg-cyan-600/10 text-cyan-500 rounded-xl font-black uppercase text-[10px] border border-cyan-600/20 hover:bg-cyan-600/20 transition-all flex items-center justify-center gap-2">
+                  ) : (
+                    <button onClick={() => setShowProfileEdit(true)} className="w-full p-3 bg-cyan-600/10 text-cyan-500 rounded-xl font-black uppercase text-[10px] border border-cyan-600/20 hover:bg-cyan-600/20 transition-all flex items-center justify-center gap-2">
                       <Camera size={14}/> Profili Düzenle
                     </button>
                   )}
@@ -1028,43 +1122,43 @@ export default function EmreBoard() {
               <div>
                 <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><Palette size={16}/> Arka Plan Türü</h3>
                 <div className="grid grid-cols-3 gap-3">
-                  {(['solid','gradient','image'] as const).map(type=>(
-                    <button key={type} onClick={()=>saveBg({...backgroundSettings,type})}
-                      className={`p-4 rounded-2xl border font-black uppercase text-[10px] transition-all ${backgroundSettings.type===type?'bg-cyan-600 border-cyan-400 text-white':'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'}`}>
-                      {type==='solid'?'Düz Renk':type==='gradient'?'Gradient':'Resim/GIF'}
+                  {(['solid', 'gradient', 'image'] as const).map(type => (
+                    <button key={type} onClick={() => saveBg({ ...backgroundSettings, type })}
+                      className={`p-4 rounded-2xl border font-black uppercase text-[10px] transition-all ${backgroundSettings.type === type ? 'bg-cyan-600 border-cyan-400 text-white' : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'}`}>
+                      {type === 'solid' ? 'Düz Renk' : type === 'gradient' ? 'Gradient' : 'Resim/GIF'}
                     </button>
                   ))}
                 </div>
               </div>
-              {backgroundSettings.type==='solid'&&(
+              {backgroundSettings.type === 'solid' && (
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
                   <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><Paintbrush size={14}/> Düz Renk</h4>
                   <div className="flex items-center gap-4">
-                    <input type="color" value={backgroundSettings.solidColor} onChange={e=>saveBg({...backgroundSettings,solidColor:e.target.value})} className="w-16 h-16 rounded-2xl border-2 border-white/10 cursor-pointer bg-transparent"/>
-                    <input type="text" value={backgroundSettings.solidColor} onChange={e=>saveBg({...backgroundSettings,solidColor:e.target.value})} className="flex-1 bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 uppercase"/>
+                    <input type="color" value={backgroundSettings.solidColor} onChange={e => saveBg({ ...backgroundSettings, solidColor: e.target.value })} className="w-16 h-16 rounded-2xl border-2 border-white/10 cursor-pointer bg-transparent"/>
+                    <input type="text" value={backgroundSettings.solidColor} onChange={e => saveBg({ ...backgroundSettings, solidColor: e.target.value })} className="flex-1 bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 uppercase"/>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    {['#050505','#0a0a0f','#0f172a','#1a1a2e','#16213e','#1f1f1f','#2d132c','#0f0f23'].map(c=>(
-                      <button key={c} onClick={()=>saveBg({...backgroundSettings,solidColor:c})} className="w-10 h-10 rounded-xl border-2 border-white/10 hover:border-cyan-500 transition-all" style={{backgroundColor:c}}/>
+                    {['#050505','#0a0a0f','#0f172a','#1a1a2e','#16213e','#1f1f1f','#2d132c','#0f0f23'].map(c => (
+                      <button key={c} onClick={() => saveBg({ ...backgroundSettings, solidColor: c })} className="w-10 h-10 rounded-xl border-2 border-white/10 hover:border-cyan-500 transition-all" style={{ backgroundColor: c }}/>
                     ))}
                   </div>
                 </div>
               )}
-              {backgroundSettings.type==='gradient'&&(
+              {backgroundSettings.type === 'gradient' && (
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
                   <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><Paintbrush size={14}/> Gradient</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    {[{label:'Başlangıç',key:'gradientStart' as const},{label:'Bitiş',key:'gradientEnd' as const}].map(({label,key})=>(
+                    {[{ label: 'Başlangıç', key: 'gradientStart' as const }, { label: 'Bitiş', key: 'gradientEnd' as const }].map(({ label, key }) => (
                       <div key={key}>
                         <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 block">{label}</label>
                         <div className="flex items-center gap-2">
-                          <input type="color" value={backgroundSettings[key]} onChange={e=>saveBg({...backgroundSettings,[key]:e.target.value})} className="w-12 h-12 rounded-xl border-2 border-white/10 cursor-pointer bg-transparent"/>
-                          <input type="text" value={backgroundSettings[key]} onChange={e=>saveBg({...backgroundSettings,[key]:e.target.value})} className="flex-1 bg-black/40 border border-white/10 p-3 rounded-xl text-[10px] font-bold outline-none focus:border-cyan-600 uppercase"/>
+                          <input type="color" value={backgroundSettings[key]} onChange={e => saveBg({ ...backgroundSettings, [key]: e.target.value })} className="w-12 h-12 rounded-xl border-2 border-white/10 cursor-pointer bg-transparent"/>
+                          <input type="text" value={backgroundSettings[key]} onChange={e => saveBg({ ...backgroundSettings, [key]: e.target.value })} className="flex-1 bg-black/40 border border-white/10 p-3 rounded-xl text-[10px] font-bold outline-none focus:border-cyan-600 uppercase"/>
                         </div>
                       </div>
                     ))}
                   </div>
-                  <select value={backgroundSettings.gradientDirection} onChange={e=>saveBg({...backgroundSettings,gradientDirection:e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 text-white">
+                  <select value={backgroundSettings.gradientDirection} onChange={e => saveBg({ ...backgroundSettings, gradientDirection: e.target.value })} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 text-white">
                     <option value="to bottom">Yukarıdan Aşağı</option>
                     <option value="to top">Aşağıdan Yukarı</option>
                     <option value="to right">Soldan Sağa</option>
@@ -1072,44 +1166,44 @@ export default function EmreBoard() {
                     <option value="to bottom right">Köşegen (Sağ Alt)</option>
                     <option value="to bottom left">Köşegen (Sol Alt)</option>
                   </select>
-                  <div className="h-20 rounded-xl border border-white/10" style={{background:`linear-gradient(${backgroundSettings.gradientDirection},${backgroundSettings.gradientStart},${backgroundSettings.gradientEnd})`}}/>
+                  <div className="h-20 rounded-xl border border-white/10" style={{ background: `linear-gradient(${backgroundSettings.gradientDirection},${backgroundSettings.gradientStart},${backgroundSettings.gradientEnd})` }}/>
                 </div>
               )}
-              {backgroundSettings.type==='image'&&(
+              {backgroundSettings.type === 'image' && (
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
                   <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><ImageIcon size={14}/> Resim / GIF Yükle</h4>
                   <input ref={bgFileInputRef} type="file" accept="image/*,image/gif,.gif" className="hidden" onChange={handleBgFileUpload}/>
-                  <button onClick={()=>bgFileInputRef.current?.click()} disabled={bgUploading}
+                  <button onClick={() => bgFileInputRef.current?.click()} disabled={bgUploading}
                     className="w-full p-6 bg-white/[0.02] border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center gap-3 hover:bg-cyan-600/5 hover:border-cyan-600/30 transition-all disabled:opacity-50">
-                    {bgUploading?<RefreshCw size={32} className="text-cyan-500 animate-spin"/>:<Upload size={32} className="text-cyan-500"/>}
-                    <p className="text-xs font-black uppercase text-zinc-400">{bgUploading?"Yükleniyor...":"Dosya Seç"}</p>
+                    {bgUploading ? <RefreshCw size={32} className="text-cyan-500 animate-spin"/> : <Upload size={32} className="text-cyan-500"/>}
+                    <p className="text-xs font-black uppercase text-zinc-400">{bgUploading ? "Yükleniyor..." : "Dosya Seç"}</p>
                     <p className="text-[9px] text-zinc-600">PNG, JPG, GIF, WEBP • cover + fixed + center</p>
                   </button>
                   <div>
                     <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span className="flex items-center gap-1"><Eye size={12}/> Bulanıklık</span><span className="text-cyan-500">{backgroundSettings.blur}px</span></label>
-                    <input type="range" min="0" max="30" value={backgroundSettings.blur} onChange={e=>saveBg({...backgroundSettings,blur:parseInt(e.target.value)})} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
+                    <input type="range" min="0" max="30" value={backgroundSettings.blur} onChange={e => saveBg({ ...backgroundSettings, blur: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
                   </div>
                   <div>
                     <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span>Koyuluk</span><span className="text-cyan-500">{backgroundSettings.opacity}%</span></label>
-                    <input type="range" min="0" max="100" value={backgroundSettings.opacity} onChange={e=>saveBg({...backgroundSettings,opacity:parseInt(e.target.value)})} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
+                    <input type="range" min="0" max="100" value={backgroundSettings.opacity} onChange={e => saveBg({ ...backgroundSettings, opacity: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
                   </div>
-                  {backgroundSettings.imageUrl&&(
+                  {backgroundSettings.imageUrl && (
                     <div className="relative h-32 rounded-xl border border-white/10 overflow-hidden">
-                      <div className="absolute inset-0" style={{backgroundImage:`url(${backgroundSettings.imageUrl})`,backgroundSize:'cover',backgroundPosition:'center',filter:backgroundSettings.blur>0?`blur(${backgroundSettings.blur}px)`:'none'}}/>
-                      <div className="absolute inset-0" style={{backgroundColor:`rgba(0,0,0,${backgroundSettings.opacity/100})`}}/>
+                      <div className="absolute inset-0" style={{ backgroundImage: `url(${backgroundSettings.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: backgroundSettings.blur > 0 ? `blur(${backgroundSettings.blur}px)` : 'none' }}/>
+                      <div className="absolute inset-0" style={{ backgroundColor: `rgba(0,0,0,${backgroundSettings.opacity / 100})` }}/>
                       <p className="absolute inset-0 flex items-center justify-center text-xs font-black uppercase text-white/80 z-10">Önizleme</p>
                     </div>
                   )}
                 </div>
               )}
-              <button onClick={()=>saveBg({type:'solid',solidColor:'#050505',gradientStart:'#050505',gradientEnd:'#1a1a2e',gradientDirection:'to bottom right',imageUrl:'',blur:0,opacity:50})}
+              <button onClick={() => saveBg({ type: 'solid', solidColor: '#050505', gradientStart: '#050505', gradientEnd: '#1a1a2e', gradientDirection: 'to bottom right', imageUrl: '', blur: 0, opacity: 50 })}
                 className="w-full p-4 bg-red-600/10 text-red-500 rounded-2xl font-black uppercase text-[10px] border border-red-600/20 hover:bg-red-600/20 transition-all">
                 Varsayılana Sıfırla
               </button>
-              {isAdmin&&(
+              {isAdmin && (
                 <div className="border-t border-white/5 pt-6">
                   <h3 className="text-sm font-black uppercase italic text-orange-400 mb-4 flex items-center gap-2"><ShieldAlert size={16}/> Admin Paneli</h3>
-                  <button onClick={()=>{setShowSettingsPanel(false);setShowSystemLogs(true);}} className="w-full p-4 bg-orange-600/10 text-orange-500 rounded-2xl font-black uppercase text-[10px] border border-orange-600/20 hover:bg-orange-600/20 transition-all flex items-center justify-center gap-2">
+                  <button onClick={() => { setShowSettingsPanel(false); setShowSystemLogs(true); }} className="w-full p-4 bg-orange-600/10 text-orange-500 rounded-2xl font-black uppercase text-[10px] border border-orange-600/20 hover:bg-orange-600/20 transition-all flex items-center justify-center gap-2">
                     <Activity size={16}/> Sistem Loglarını Gör
                   </button>
                 </div>
@@ -1119,17 +1213,22 @@ export default function EmreBoard() {
         </div>
       )}
 
-      {/* ── SİSTEM LOGLARI ───────────────────────────────────────────────────── */}
-      {showSystemLogs&&isAdmin&&(
+      {/* ── SİSTEM LOGLARI ──────────────────────────────────────────────────── */}
+      {showSystemLogs && isAdmin && (
         <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
           <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-orange-600/10 to-transparent">
             <h2 className="text-2xl font-black uppercase italic text-orange-500 flex items-center gap-3"><ShieldAlert size={28}/> Sistem Logları</h2>
-            <button onClick={()=>setShowSystemLogs(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
+            <button onClick={() => setShowSystemLogs(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
           </div>
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar-v">
             <div className="max-w-6xl mx-auto">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {[{val:logs.length,label:'Toplam Log',color:'text-blue-500'},{val:getVisibleUsers().length,label:'Kullanıcı',color:'text-green-500'},{val:files.length,label:'Dosya',color:'text-purple-500'},{val:categories.length,label:'Kategori',color:'text-orange-500'}].map(({val,label,color})=>(
+                {[
+                  { val: logs.length, label: 'Toplam Log', color: 'text-blue-500' },
+                  { val: getVisibleUsers().length, label: 'Kullanıcı', color: 'text-green-500' },
+                  { val: cards.length, label: 'Kart', color: 'text-purple-500' },
+                  { val: lists.length, label: 'Liste', color: 'text-orange-500' }
+                ].map(({ val, label, color }) => (
                   <div key={label} className="bg-zinc-900/60 border border-white/10 rounded-2xl p-6 text-center">
                     <p className={`text-4xl font-black ${color}`}>{val}</p>
                     <p className="text-[10px] font-bold text-zinc-500 uppercase mt-1">{label}</p>
@@ -1139,15 +1238,15 @@ export default function EmreBoard() {
               <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] overflow-hidden">
                 <div className="p-6 border-b border-white/5"><h3 className="font-black uppercase italic text-sm">Tüm Tıklama Geçmişi</h3></div>
                 <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto custom-scrollbar-v">
-                  {logs.map(log=>(
+                  {logs.map(log => (
                     <div key={log.id} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-all">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/40 shrink-0 p-1"><img src={log.image_url} className="w-full h-full object-contain" alt=""/></div>
                       <div className="flex-1 min-w-0">
                         <p className="font-black italic uppercase text-sm truncate">{log.title}</p>
                         <div className="flex items-center gap-3 mt-1">
-                          <span className="text-[9px] font-bold text-blue-400 bg-blue-600/20 px-2 py-0.5 rounded-full">{log.user_name||'Anonim'}</span>
+                          <span className="text-[9px] font-bold text-blue-400 bg-blue-600/20 px-2 py-0.5 rounded-full">{log.user_name || 'Anonim'}</span>
                           <span className="text-[9px] font-bold text-zinc-500">{new Date(log.created_at).toLocaleString('tr-TR')}</span>
-                          {log.file_id&&<span className="text-[9px] font-bold text-zinc-600">ID:{log.file_id}</span>}
+                          {log.card_id && <span className="text-[9px] font-bold text-zinc-600">ID:{log.card_id}</span>}
                         </div>
                       </div>
                     </div>
@@ -1159,10 +1258,10 @@ export default function EmreBoard() {
         </div>
       )}
 
-      {/* ── GLOBAL RANDOM CARD MODAL ─────────────────────────────────────────── */}
-      {randomCard&&(
-        <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={()=>setRandomCard(null)}>
-          <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem] shadow-4xl" onClick={e=>e.stopPropagation()}>
+      {/* ── GLOBAL RANDOM CARD MODAL ────────────────────────────────────────── */}
+      {randomCard && (
+        <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomCard(null)}>
+          <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem] shadow-4xl" onClick={e => e.stopPropagation()}>
             <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4">
               <img src={randomCard.image_url} className="w-full h-full object-contain" alt=""/>
             </div>
@@ -1170,8 +1269,8 @@ export default function EmreBoard() {
               <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-2">🎲 Seçilen Kart</p>
               <h2 className="text-3xl font-black italic uppercase mb-8">{randomCard.title}</h2>
               <div className="flex gap-4 px-6">
-                <button onClick={()=>setRandomCard(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
-                <button onClick={()=>handleCardClick(randomCard)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">GİT</button>
+                <button onClick={() => setRandomCard(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
+                <button onClick={() => handleCardClick(randomCard)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">GİT</button>
               </div>
             </div>
           </div>
