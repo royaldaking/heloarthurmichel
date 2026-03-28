@@ -39,8 +39,8 @@ export default function EmreBoard() {
   const [avatarUrl, setAvatarUrl] = useState("");
 
   // ── Ana veri ──────────────────────────────────────────────────────────────
-  const [lists, setLists] = useState<List[]>([]);
-  const [cards, setCards] = useState<Card[]>([]);
+  const [categories, setCategories] = useState<List[]>([]);
+  const [files, setFiles] = useState<Card[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
