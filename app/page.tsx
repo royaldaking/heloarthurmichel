@@ -207,7 +207,7 @@ export default function EmreBoard() {
 
   // ── VERİ ÇEKME — her zaman order_index asc ───────────────────────────────────
   async function fetchAllData() {
-    const { data: catData } = await supabase.from("kategoriler").select("*").order("order_index", { ascending: true });
+    const { data: catData } = await supabase.from("lists").select("*").order("order_index", { ascending: true });
     if (catData) setCategories(catData as Category[]);
     const { data: fileData } = await supabase.from("arsiv").select("*").order("order_index", { ascending: true });
     if (fileData) setFiles(fileData as ArchiveItem[]);
@@ -228,8 +228,8 @@ export default function EmreBoard() {
       return c;
     });
     setCategories([...updated].sort((a, b) => a.order_index - b.order_index));
-    await supabase.from("kategoriler").update({ order_index: tar.order_index }).eq("id", cur.id);
-    await supabase.from("kategoriler").update({ order_index: cur.order_index }).eq("id", tar.id);
+    await supabase.from("lists").update({ order_index: tar.order_index }).eq("id", cur.id);
+    await supabase.from("lists").update({ order_index: cur.order_index }).eq("id", tar.id);
   };
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────────
@@ -437,9 +437,9 @@ export default function EmreBoard() {
 
   const handleCategoryRename = async (id: string, oldName: string) => {
     const n = prompt("Yeni isim:", oldName);
-    if (n) { await supabase.from("kategoriler").update({ name: n }).eq("id", id); fetchAllData(); }
+    if (n) { await supabase.from("lists").update({ name: n }).eq("id", id); fetchAllData(); }
   };
-  const deleteCategory = async (id: string) => { if (confirm("Silinsin mi?")) { await supabase.from("kategoriler").delete().eq("id", id); fetchAllData(); } };
+  const deleteCategory = async (id: string) => { if (confirm("Silinsin mi?")) { await supabase.from("lists").delete().eq("id", id); fetchAllData(); } };
   const deleteFile = async (id: number) => { if (confirm("Kart silinsin mi?")) { await supabase.from("arsiv").delete().eq("id", id); fetchAllData(); } };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -464,7 +464,7 @@ export default function EmreBoard() {
     const name = prompt("Liste adı:");
     if (name) {
       const maxIdx = categories.length > 0 ? Math.max(...categories.map(c => c.order_index || 0)) : 0;
-      await supabase.from("kategoriler").insert([{ id: `cat-${Date.now()}`, name: name.trim(), order_index: maxIdx + 1 }]);
+      await supabase.from("lists").insert([{ id: `cat-${Date.now()}`, name: name.trim(), order_index: maxIdx + 1 }]);
       fetchAllData();
     }
   };
