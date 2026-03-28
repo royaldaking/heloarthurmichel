@@ -795,11 +795,11 @@ const handleChangeList = async (newListId: string) => {
                   >
                   {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
 
-{/* KART İÇERİĞİ SARMALAYICI BİTİŞİ (Eksik olan buydu) */}
-                </div> 
+{/* KART İÇERİĞİ SARMALAYICI BİTİŞİ */}
+                </div>
 
-                <button 
-                  onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} 
+                <button
+                  onClick={() => { setTargetListId(list.id); setShowAddModal(true); }}
                   className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase"
                 >
                   + Kart Ekle
@@ -814,15 +814,15 @@ const handleChangeList = async (newListId: string) => {
           <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
             <div className="w-full max-w-sm bg-zinc-900 border border-purple-600/30 p-8 rounded-[3rem] shadow-4xl">
               <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3">
-                <ArrowLeftRight size={22}/> Liste Değiştir
+                <ArrowLeftRight size={22} /> Liste Değiştir
               </h2>
               <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">
                 "{changeCatTarget.title}" kartını taşı
               </p>
               <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
-                {categories.filter(l => l.id !== changeCatTarget.category).map(list => (
-                  <button 
-                    key={list.id} 
+                {categories.filter((l) => l.id !== changeCatTarget.category).map((list) => (
+                  <button
+                    key={list.id}
                     onClick={() => handleChangeList(list.id)}
                     className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all"
                   >
@@ -830,8 +830,8 @@ const handleChangeList = async (newListId: string) => {
                   </button>
                 ))}
               </div>
-              <button 
-                onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }} 
+              <button
+                onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }}
                 className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase"
               >
                 İptal
