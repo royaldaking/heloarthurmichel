@@ -754,7 +754,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       </div>
 
-     {/* ── BOARD ───────────────────────────────────────────────────────────── */}
+      {/* ── BOARD ───────────────────────────────────────────────────────────── */}
       <div
         ref={scrollContainerRef}
         onMouseDown={handleMouseDown}
@@ -780,43 +780,41 @@ const handleChangeList = async (newListId: string) => {
                 </div>
                 <h2 className="font-black text-[10px] md:text-[12px] uppercase tracking-widest text-blue-500 italic flex-1 text-center px-1">{list.title}</h2>
                 <div className="flex items-center gap-0.5">
-                  {isAdmin && (
-                    <>
-                      <button onClick={() => handleListRename(list.id, list.title)} className="p-1.5 text-blue-500/50 hover:text-blue-500 transition-all"><Edit3 size={14}/></button>
-                      <button onClick={() => deleteList(list.id)} className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
-                    </>
-                  )}
+                  {isAdmin && <>
+                    <button onClick={() => handleListRename(list.id, list.title)} className="p-1.5 text-blue-500/50 hover:text-blue-500 transition-all"><Edit3 size={14}/></button>
+                    <button onClick={() => deleteList(list.id)} className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
+                  </>}
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
-                {listfiles.map((file, idx) => (
+                {listfiles.map((files, idx) => (
                   <div
-                    id={`file-${file.id}`}
-                    key={file.id}
-                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === file.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
+                    id={`files-${files.id}`}
+                    key={files.id}
+                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
                   >
-                    {isAdmin && <button onClick={() => startEditing(file)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
+                  {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
 
-                    <button onClick={() => { setChangeCatTarget(file); setShowChangeCatModal(true); }}
-                      className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
-                      <ArrowLeftRight size={14}/>
-                    </button>
+{/* BURASI DÜZELDİ: onClick eklendi */}
+<button onClick={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
+  className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
+  <ArrowLeftRight size={14}/>
+</button>
 
-                    <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => movefiles(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
-                      <button onClick={() => movefiles(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
-                    </div>
+<div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
+  <button onClick={() => movefiles(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
+  <button onClick={() => movefiles(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
+</div>
 
-                    <button onClick={() => { if(file.mega_url) window.open(file.mega_url, "_blank"); }} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
-                      <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
-                    </button>
+{/* BURASI DÜZELDİ: Linkin açılması için window.open eklendi */}
+<button onClick={() => { if(files.mega_url) window.open(files.mega_url, "_blank"); }} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
+  <img src={files.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+</button>
 
-                    <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-                      <span className="truncate pr-2">{file.title}</span>
-                      {isAdmin && <button onClick={() => deletefiles(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
-                    </div>
-                  </div>
-                ))}
+<div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
+  <span className="truncate pr-2">{files.title}</span>
+  {isAdmin && <button onClick={() => deletefiles(files.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
+</div>
                 <button onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
               </div>
             </div>
@@ -837,6 +835,194 @@ const handleChangeList = async (newListId: string) => {
               ))}
             </div>
             <button onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }} className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase">İptal</button>
+          </div>
+        </div>
+      )}
+
+{/* ── AKTİVİTE PANELİ (TEK VE TEMİZ BLOK) ─────────────────────────────────── */}
+      {showActivityPanel && (
+        <div className="fixed inset-0 z-[600] bg-[#050505] flex flex-col overflow-hidden">
+          <div className="p-8 border-b border-white/5 flex flex-col gap-4 bg-zinc-900/50">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                {(selectedUser || searchedUserData) && (
+                  <button onClick={() => { setSelectedUser(null); setSearchedUserData(null); setUserSearchQuery(""); }} className="p-2 bg-white/5 rounded-lg text-zinc-400">
+                    <ChevronLeft size={20}/>
+                  </button>
+                )}
+                <h2 className="text-3xl font-black uppercase italic">
+                  {searchedUserData ? `${searchedUserData.user} - Profil` : selectedUser ? `${selectedUser} - Aktiviteler` : 'Kullanıcı Listesi'}
+                </h2>
+              </div>
+              <button onClick={() => { setShowActivityPanel(false); setSelectedUser(null); setSearchedUserData(null); setUserSearchQuery(""); }} className="p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600 transition-all">
+                <X size={24}/>
+              </button>
+            </div>
+
+            {!selectedUser && !searchedUserData && (
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
+                  <input type="text" value={userSearchQuery} onChange={e => setUserSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleUserSearch()} placeholder="Kullanıcı ara..." className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-green-600"/>
+                </div>
+                <button onClick={handleUserSearch} className="px-6 bg-green-600 rounded-2xl font-black text-[10px] uppercase hover:bg-green-500 transition-all">Ara</button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar-v">
+            {/* ARAMA SONUCU: PROFIL GÖRÜNÜMÜ */}
+            {searchedUserData && (
+              <div className="max-w-4xl mx-auto space-y-8">
+                <div className="bg-zinc-900/60 border border-white/10 rounded-[2rem] p-8 flex items-center gap-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 bg-zinc-800 rounded-2xl flex items-center justify-center font-black italic text-4xl overflow-hidden">
+                      {userProfiles[searchedUserData.user] ? <img src={userProfiles[searchedUserData.user]} className="w-full h-full object-cover" alt=""/> : searchedUserData.user[0].toUpperCase()}
+                    </div>
+                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-zinc-900 ${isUserOnline(searchedUserData.user) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black uppercase italic">{searchedUserData.user}</h3>
+                    <p className={`text-sm font-bold ${isUserOnline(searchedUserData.user) ? 'text-green-400' : 'text-zinc-500'}`}>{getLastSeen(searchedUserData.user)}</p>
+                    <p className="text-xs text-zinc-600 mt-2">{searchedUserData.logs.length} aktivite | {searchedUserData.files?.length || 0} kart tıklamış</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {searchedUserData.logs.slice(0, 10).map(log => (
+                    <div key={log.id} className="flex items-center p-4 bg-zinc-900/80 border border-white/5 rounded-2xl gap-4">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/40 p-1"><img src={log.image_url} className="w-full h-full object-contain" alt=""/></div>
+                      <div><p className="font-black italic uppercase text-sm">{log.title}</p><p className="text-[9px] text-zinc-500 font-bold">{new Date(log.created_at).toLocaleString('tr-TR')}</p></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ANA LİSTE: KULLANICI KARTLARI */}
+            {!selectedUser && !searchedUserData && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {getVisibleUsers().map(uName => (
+                  <div key={uName} className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 aspect-[4/3] flex flex-col items-center justify-center transition-all hover:border-blue-600/50 shadow-2xl">
+                    {userProfiles[uName] && <img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt=""/>}
+                    <label className="absolute top-4 right-4 p-2 bg-black/60 rounded-xl text-blue-500 opacity-0 group-hover:opacity-100 cursor-pointer z-20"><ImageIcon size={16}/><input type="file" accept="image/*" className="hidden" onChange={e => handleUserPhotoUpload(uName, e)}/></label>
+                    <div className={`absolute top-4 left-4 px-2 py-1 rounded-full text-[8px] font-black uppercase ${isUserOnline(uName) ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400'}`}>{isUserOnline(uName) ? 'Çevrimiçi' : 'Çevrimdışı'}</div>
+                    <User className="mb-4 text-blue-500 relative z-10" size={48}/>
+                    <button onClick={() => setSelectedUser(uName)} className="relative z-10 font-black uppercase italic text-lg tracking-wider hover:text-blue-400">{uName}</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* SEÇİLİ KULLANICI AKTİVİTELERİ */}
+            {selectedUser && !searchedUserData && (
+              <div className="max-w-4xl mx-auto space-y-4">
+                {logs.filter(l => l.user_name === selectedUser).map(log => (
+                  <div key={log.id} className="flex items-center p-5 bg-zinc-900/80 border border-white/10 rounded-[1.5rem] group hover:bg-blue-600/5 transition-all gap-5">
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-black/40 p-1"><img src={log.image_url} className="w-full h-full object-contain" alt=""/></div>
+                    <div><p className="font-black italic uppercase text-lg group-hover:text-blue-400">{log.title}</p><p className="text-[10px] text-zinc-500 font-bold uppercase">{new Date(log.created_at).toLocaleString('tr-TR')}</p></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── SOHBET ──────────────────────────────────────────────────────────── */}
+      {showChatPanel && (
+        <div className="fixed inset-0 z-[700] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
+          <div className="w-full max-w-6xl h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-row shadow-4xl relative">
+            <div className="w-80 border-r border-white/5 flex flex-col bg-zinc-900/30">
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <h3 className="font-black uppercase italic text-sm text-blue-500">Arkadaşlar</h3>
+                <button onClick={() => setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 transition-all"><UserPlus size={18}/></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                <div onClick={() => setActiveChatFriend(ADMIN_NAME)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === ADMIN_NAME ? 'bg-blue-600 border-blue-400 shadow-lg' : 'bg-blue-600/10 border-blue-600/20'}`}>
+                  <div className="relative">
+                    <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center font-black overflow-hidden">
+                      {userProfiles[ADMIN_NAME] ? <img src={userProfiles[ADMIN_NAME]} className="w-full h-full object-cover" alt=""/> : "E"}
+                    </div>
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(ADMIN_NAME) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-black uppercase italic">Emre (Admin)</p>
+                    <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(ADMIN_NAME) ? 'text-green-400' : 'text-white/50'}`}>
+                      {isUserOnline(ADMIN_NAME) ? <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/> : <Clock size={8}/>} {getLastSeen(ADMIN_NAME)}
+                    </p>
+                  </div>
+                </div>
+                {friends.map((fName, i) => (
+                  <div key={i} onClick={() => setActiveChatFriend(fName)} className={`p-4 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${activeChatFriend === fName ? 'bg-zinc-700 border-zinc-500 shadow-lg' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
+                    <div className="relative">
+                      <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center font-black italic overflow-hidden">
+                        {userProfiles[fName] ? <img src={userProfiles[fName]} className="w-full h-full object-cover" alt=""/> : fName[0].toUpperCase()}
+                      </div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(fName) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-black uppercase italic">{fName}</p>
+                      <p className={`text-[8px] font-bold flex items-center gap-1 ${isUserOnline(fName) ? 'text-green-400' : 'text-zinc-500'}`}>
+                        {isUserOnline(fName) ? <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/> : <Clock size={8}/>} {getLastSeen(fName)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col relative bg-black/20">
+              {activeChatFriend ? (
+                <>
+                  <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center font-black overflow-hidden">
+                        {userProfiles[activeChatFriend] ? <img src={userProfiles[activeChatFriend]} className="w-full h-full object-cover" alt=""/> : activeChatFriend[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-black uppercase italic">{activeChatFriend}</h4>
+                        <p className={`text-[9px] font-bold ${isUserOnline(activeChatFriend) ? 'text-green-400' : 'text-zinc-500'}`}>{getLastSeen(activeChatFriend)}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setShowChatPanel(false)} className="p-2 text-zinc-500 hover:text-white"><X/></button>
+                  </div>
+                  <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar-v">
+                    {messages.map((msg, i) => {
+                      const isMe = msg.sender_name === currentUserName;
+                      return (
+                        <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[70%] p-4 rounded-2xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-zinc-800 text-zinc-200 rounded-tl-none'}`}>
+                            <p className="text-sm font-medium">{msg.text}</p>
+                            <p className="text-[8px] text-white/30 text-right mt-1">{msg.created_at ? new Date(msg.created_at).toLocaleTimeString() : ""}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={chatEndRef}/>
+                  </div>
+                  <form onSubmit={handleSendMessage} className="p-6 border-t border-white/5 flex gap-4 bg-zinc-900/30">
+                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={`${activeChatFriend} kişisine mesaj yaz...`} className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:border-blue-600"/>
+                    <button type="submit" className="p-4 bg-blue-600 rounded-2xl hover:bg-blue-500 transition-all"><Send size={18}/></button>
+                  </form>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 uppercase italic font-black">
+                  <MessageCircle size={64} className="mb-4 opacity-20"/><p>Mesajlaşmak için bir arkadaş seç</p>
+                </div>
+              )}
+            </div>
+            {showAddFriendModal && (
+              <div className="absolute inset-0 z-[800] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+                <div className="w-full max-w-sm bg-zinc-900 border border-white/10 p-8 rounded-[2rem] text-center">
+                  <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadaş Ara</h3>
+                  <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTİF KULLANICILAR EKLENEBİLİR</p>
+                  <input type="text" value={searchFriendName} onChange={e => setSearchFriendName(e.target.value)} placeholder="Tam kullanıcı adı..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6"/>
+                  <div className="flex gap-4">
+                    <button onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
+                    <button onClick={handleAddFriend} className="flex-1 p-3 bg-blue-600 rounded-xl text-[10px] font-black uppercase">Ekle</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
