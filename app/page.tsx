@@ -897,6 +897,25 @@ const handleChangeList = async (newListId: string) => {
               </div>
             )}
 
+            {/* KULLANICI LİSTESİ */}
+            {!selectedUser && !searchedUserData && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {getVisibleUsers().map(uName => (
+                  <div key={uName} className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 aspect-[4/3] flex flex-col items-center justify-center transition-all hover:border-blue-600/50 shadow-2xl">
+                    {userProfiles[uName] && <img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt=""/>}
+                    <User className="mb-4 text-blue-500 relative z-10" size={48}/>
+                    <button onClick={() => setSelectedUser(uName)} className="relative z-10 font-black uppercase italic text-lg tracking-wider hover:text-blue-400">{uName}</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div> 
+        </div>
+      )}
+      </div> // Ana kapsayıcı div
+  );
+}
+
             {/* ANA LİSTE: KULLANICI KARTLARI */}
             {!selectedUser && !searchedUserData && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
