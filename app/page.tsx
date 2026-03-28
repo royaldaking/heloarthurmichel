@@ -762,7 +762,7 @@ export default function EmreBoard() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
-                {listfiless.map((files, idx) => (
+                {listfiles.map((files, idx) => (
                   <div
                     id={`files-${files.id}`}
                     key={files.id}
