@@ -266,7 +266,9 @@ export default function EmreBoard() {
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
   const movefiles = async (index: number, direction: 'up' | 'down', listId: string) => {
-    const listfiles = [...files.filter(c => c.category === listId)].sort((a, b) => a.order_index - b.order_index);
+   const listfiles = files
+  .filter(c => String(c.category) === String(listId))
+  .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
     const tIdx = direction === 'up' ? index - 1 : index + 1;
     if (tIdx < 0 || tIdx >= listfiles.length) return;
     const cur = listfiles[index];
@@ -281,15 +283,38 @@ export default function EmreBoard() {
   };
 
   // ── KART LİSTE DEĞİŞTİRME ────────────────────────────────────────────────
-  const handleChangeList = async (newListId: string) => {
-    if (!changeCatTarget) return;
-    const listfiles = files.filter(c => c.category === newListId);
-    const maxIdx = listfiles.length > 0 ? Math.max(...listfiles.map(c => c.order_index)) : 0;
-    await supabase.from("arsiv").update({ category: newListId, order_index: maxIdx + 1 }).eq("id", changeCatTarget.id);
-    setShowChangeCatModal(false);
-    setChangeCatTarget(null);
-    fetchAllData();
-  };
+const handleChangeList = async (newListId: string) => {
+  if (!changeCatTarget) return;
+
+  // 1. Hedef kategorideki dosyaları filtrele (Sıralama için en büyük index'i bulacağız)
+  const targetCategoryFiles = files.filter(c => String(c.category) === String(newListId));
+  
+  // 2. Yeni kategoride en sona eklemek için max index'i hesapla
+  const maxIdx = targetCategoryFiles.length > 0 
+    ? Math.max(...targetCategoryFiles.map(c => c.order_index || 0)) 
+    : 0;
+
+  // 3. Supabase'i güncelle (list_id bitti, artık category sütununa newListId yani kategori adını yazıyoruz)
+  const { error } = await supabase
+    .from("arsiv")
+    .update({ 
+      category: newListId, // Burası 'category' olmalı
+      order_index: maxIdx + 1 
+    })
+    .eq("id", changeCatTarget.id);
+
+  if (error) {
+    console.error("Taşıma hatası:", error.message);
+    return;
+  }
+
+  // 4. State'i ve Modalı kapat
+  setShowChangeCatModal(false);
+  setChangeCatTarget(null);
+  
+  // 5. Verileri tazele (Bu sayede Mega linkleri ve yeni sıralama anında düzelir)
+  await fetchAllData();
+};
 
   // ── GLOBAL RASTGELE KART (sağ-alt buton) ─────────────────────────────────
   const pickGlobalRandom = () => {
@@ -769,7 +794,7 @@ export default function EmreBoard() {
                     className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
                   >
                     {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
-                    <button onClick={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
+                    <button ={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
                       className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
                       <ArrowLeftRight size={14}/>
                     </button>
@@ -821,7 +846,84 @@ export default function EmreBoard() {
               </div>
               <button onClick={() => { setShowActivityPanel(false); setSelectedUser(null); setSearchedUserData(null); setUserSearchQuery(""); }} className="p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600 transition-all"><X size={24}/></button>
             </div>
-            {!selectedUser && !searchedUserData && (
+            {!selectedUser && !searchedUserData && {/* ── BOARD ───────────────────────────────────────────────────────────── */}
+<div
+  ref={scrollContainerRef}
+  onMouseDown={handleMouseDown}
+  onMouseLeave={() => setIsDragging(false)}
+  onMouseUp={() => setIsDragging(false)}
+  onMouseMove={handleMouseMove}
+  className={`flex-1 overflow-x-auto custom-scrollbar flex items-start p-6 md:p-10 gap-6 md:gap-8 h-full transition-all duration-500 relative z-10 ${!isSidebarOpen ? 'md:pl-24' : ''} ${isDragging ? 'cursor-grabbing select-none' : 'cursor-default'}`}
+>
+  {categories.map((list, listIdx) => {
+    // BURASI ÖNEMLİ: getSortedListfiles fonksiyonuna list.title veya list.id hangisiyle filtreliyorsan onu gönder
+    const listfiles = getSortedListfiles(list.title || list.id); 
+    
+    return (
+      <div key={list.id} className="w-[260px] md:w-[340px] shrink-0 bg-zinc-900/70 backdrop-blur-md border border-white/5 rounded-[2.5rem] flex flex-col max-h-[85vh] relative shadow-2xl">
+        <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => moveList(listIdx, 'left')} disabled={listIdx === 0}
+              className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
+              <ChevronLeft size={14}/>
+            </button>
+            <button onClick={() => moveList(listIdx, 'right')} disabled={listIdx === categories.length - 1}
+              className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
+              <ChevronRight size={14}/>
+            </button>
+          </div>
+          <h2 className="font-black text-[10px] md:text-[12px] uppercase tracking-widest text-blue-500 italic flex-1 text-center px-1">{list.title}</h2>
+          <div className="flex items-center gap-0.5">
+            {isAdmin && <>
+              <button onClick={() => handleListRename(list.id, list.title)} className="p-1.5 text-blue-500/50 hover:text-blue-500 transition-all"><Edit3 size={14}/></button>
+              <button onClick={() => deleteList(list.id)} className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
+            </>}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
+          {listfiles.map((file, idx) => ( // 'files' yerine 'file' kullanmak daha az kafa karıştırır
+            <div
+              id={`file-${file.id}`}
+              key={file.id}
+              className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === file.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
+            >
+              {isAdmin && <button onClick={() => startEditing(file)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
+              
+              {/* HATALI YER: onClick ekledim, 'files' yerine 'file' yaptım */}
+              <button onClick={() => { setChangeCatTarget(file); setShowChangeCatModal(true); }}
+                className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
+                <ArrowLeftRight size={14}/>
+              </button>
+
+              <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
+                <button onClick={() => movefiles(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
+                <button onClick={() => movefiles(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
+              </div>
+
+              {/* MEGA LİNKİNİN AÇILDIĞI ASIL YER BURASI */}
+              <button onClick={() => {
+                if (file.mega_url) {
+                  window.open(file.mega_url, "_blank");
+                } else {
+                  alert("Link bulunamadı!");
+                }
+              }} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
+                <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+              </button>
+
+              <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
+                <span className="truncate pr-2">{file.title}</span>
+                {isAdmin && <button onClick={() => deletefiles(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
+              </div>
+            </div>
+          ))}
+          <button onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
+        </div>
+      </div>
+    );
+  })}
+</div>(
               <div className="flex gap-3">
                 <div className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
                   <input type="text" value={userSearchQuery} onChange={e => setUserSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleUserSearch()} placeholder="Kullanıcı ara..." className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-green-600"/></div>
