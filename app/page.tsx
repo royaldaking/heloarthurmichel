@@ -25,7 +25,7 @@ interface ArchiveItem {
   title: string; 
   mega_url: string; 
   image_url: string; 
-  list_id: string; 
+  category: string; 
   order_index: number; // order -> order_index oldu
 }
 
@@ -81,7 +81,7 @@ export default function EmreBoard() {
   const [editTitle, setEditTitle] = useState("");
   const [editMegaUrl, setEditMegaUrl] = useState("");
   const [editFile, setEditFile] = useState<File | null>(null);
-  const [editListId, setEditListId] = useState("");
+  const [editId, setEditListId] = useState("");
 
   const [showChangeCatModal, setShowChangeCatModal] = useState(false);
   const [changeCatTarget, setChangeCatTarget] = useState<files | null>(null);
@@ -266,7 +266,7 @@ export default function EmreBoard() {
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
   const movefiles = async (index: number, direction: 'up' | 'down', listId: string) => {
-    const listfiles = [...files.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
+    const listfiles = [...files.filter(c => c.category === listId)].sort((a, b) => a.order_index - b.order_index);
     const tIdx = direction === 'up' ? index - 1 : index + 1;
     if (tIdx < 0 || tIdx >= listfiles.length) return;
     const cur = listfiles[index];
@@ -283,9 +283,9 @@ export default function EmreBoard() {
   // ── KART LİSTE DEĞİŞTİRME ────────────────────────────────────────────────
   const handleChangeList = async (newListId: string) => {
     if (!changeCatTarget) return;
-    const listfiles = files.filter(c => c.list_id === newListId);
+    const listfiles = files.filter(c => c.category === newListId);
     const maxIdx = listfiles.length > 0 ? Math.max(...listfiles.map(c => c.order_index)) : 0;
-    await supabase.from("arsiv").update({ list_id: newListId, order_index: maxIdx + 1 }).eq("id", changeCatTarget.id);
+    await supabase.from("arsiv").update({ category: newListId, order_index: maxIdx + 1 }).eq("id", changeCatTarget.id);
     setShowChangeCatModal(false);
     setChangeCatTarget(null);
     fetchAllData();
@@ -467,7 +467,7 @@ export default function EmreBoard() {
     setEditTitle(files.title);
     setEditMegaUrl(files.mega_url);
     setEditFile(null);
-    setEditListId(files.list_id);
+    setEditListId(files.category);
     setShowEditModal(true);
   };
 
@@ -484,15 +484,15 @@ export default function EmreBoard() {
         img = ud.publicUrl;
       }
       let oi = editingfiles.order_index;
-      if (editListId !== editingfiles.list_id) {
-        const lc = files.filter(c => c.list_id === editListId);
+      if (editListId !== editingfiles.category) {
+        const lc = files.filter(c => c.category === editListId);
         oi = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) + 1 : 0;
       }
       await supabase.from("arsiv").update({
         title: editTitle.toUpperCase(),
         mega_url: editMegaUrl,
         image_url: img,
-        list_id: editListId,
+        category: editListId,
         order_index: oi
       }).eq("id", editingfiles.id);
       setShowEditModal(false);
@@ -550,7 +550,7 @@ export default function EmreBoard() {
     }
   };
 
-  // ── KART YÜKLEMESİ — list_id kullan ─────────────────────────────────────
+  // ── KART YÜKLEMESİ — category kullan ─────────────────────────────────────
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile || !title || !megaUrl || !targetListId) return alert("Eksik alan var!");
@@ -559,13 +559,13 @@ export default function EmreBoard() {
       const fn = `${Date.now()}-${selectedFile.name.replace(/\s/g, '-')}`;
       await supabase.storage.from("arsiv-dosyalari").upload(fn, selectedFile);
       const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
-      const lc = files.filter(c => c.list_id === targetListId);
+      const lc = files.filter(c => c.category === targetListId);
       const maxIdx = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) : 0;
       await supabase.from("arsiv").insert([{
         title: title.toUpperCase(),
         mega_url: megaUrl,
         image_url: ud.publicUrl,
-        list_id: targetListId,
+        category: targetListId,
         order_index: maxIdx + 1
       }]);
       setShowAddModal(false); setTitle(""); setMegaUrl(""); setSelectedFile(null);
@@ -597,7 +597,7 @@ export default function EmreBoard() {
   };
 
   const getSortedListfiles = (listId: string) =>
-    [...files.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
+    [...files.filter(c => c.category === listId)].sort((a, b) => a.order_index - b.order_index);
 
   const saveBg = (s: BackgroundSettings) => {
     setBackgroundSettings(s);
@@ -800,7 +800,7 @@ export default function EmreBoard() {
             <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3"><ArrowLeftRight size={22}/> Liste Değiştir</h2>
             <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">"{changeCatTarget.title}" kartını taşı</p>
             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
-              {categories.filter(l => l.id !== changeCatTarget.list_id).map(list => (
+              {categories.filter(l => l.id !== changeCatTarget.category).map(list => (
                 <button key={list.id} onClick={() => handleChangeList(list.id)}
                   className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all">{list.title}</button>
               ))}
