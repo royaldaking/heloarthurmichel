@@ -51,6 +51,10 @@ export default function EmreBoard() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login'); // Bunu tam buraya ekle
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  // Eğer hata verirse diye şunları da sağlama alalım:
+  const [error, setError] = useState<string | null>(null);
   // ── Ana veri ──────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<Category[]>([]);
   const [files, setFiles] = useState<ArchiveItem[]>([]);
