@@ -13,8 +13,8 @@ const supabaseUrl = "https://wobnwchodzgsofpybztg.supabase.co";
 const supabaseKey = "sb_publishable_JgD3W7_LA5OLvE_j2GzgSw_4vBaKN7N";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-interface Category { id: string; name: string; order_index: number; }
-interface ArchiveItem { id: number; title: string; mega_url: string; image_url: string; category: string; order_index: number; }
+interface Category { id: string; name: string; order: number; }
+interface ArchiveItem { id: number; title: string; mega_url: string; image_url: string; category: string; order: number; }
 interface LogEntry { id: number; created_at: string; title: string; image_url: string; user_name?: string; file_id?: number | null; }
 interface Message { id?: number; created_at?: string; sender_name: string; receiver_name: string; text: string; }
 interface BackgroundSettings {
@@ -205,11 +205,11 @@ export default function EmreBoard() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  // ── VERİ ÇEKME — her zaman order_index asc ───────────────────────────────────
+  // ── VERİ ÇEKME — her zaman order asc ───────────────────────────────────
   async function fetchAllData() {
-    const { data: catData } = await supabase.from("lists").select("*").order("order_index", { ascending: true });
+    const { data: catData } = await supabase.from("lists").select("*").order("order", { ascending: true });
     if (catData) setCategories(catData as Category[]);
-    const { data: fileData } = await supabase.from("arsiv").select("*").order("order_index", { ascending: true });
+    const { data: fileData } = await supabase.from("arsiv").select("*").order("order", { ascending: true });
     if (fileData) setFiles(fileData as ArchiveItem[]);
     const { data: logData } = await supabase.from("logs").select("*").order("id", { ascending: false });
     if (logData) setLogs(logData as LogEntry[]);
@@ -223,37 +223,37 @@ export default function EmreBoard() {
     const tar = categories[tIdx];
     // Optimistik güncelle
     const updated = categories.map((c, i) => {
-      if (i === index) return { ...c, order_index: tar.order_index };
-      if (i === tIdx)  return { ...c, order_index: cur.order_index };
+      if (i === index) return { ...c, order: tar.order };
+      if (i === tIdx)  return { ...c, order: cur.order };
       return c;
     });
-    setCategories([...updated].sort((a, b) => a.order_index - b.order_index));
-    await supabase.from("lists").update({ order_index: tar.order_index }).eq("id", cur.id);
-    await supabase.from("lists").update({ order_index: cur.order_index }).eq("id", tar.id);
+    setCategories([...updated].sort((a, b) => a.order - b.order));
+    await supabase.from("lists").update({ order: tar.order }).eq("id", cur.id);
+    await supabase.from("lists").update({ order: cur.order }).eq("id", tar.id);
   };
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────────
   const moveItem = async (index: number, direction: 'up' | 'down', catId: string) => {
-    const catFiles = [...files.filter(f => f.category === catId)].sort((a, b) => a.order_index - b.order_index);
+    const catFiles = [...files.filter(f => f.category === catId)].sort((a, b) => a.order - b.order);
     const tIdx = direction === 'up' ? index - 1 : index + 1;
     if (tIdx < 0 || tIdx >= catFiles.length) return;
     const cur = catFiles[index];
     const tar = catFiles[tIdx];
     setFiles(prev => prev.map(f => {
-      if (f.id === cur.id) return { ...f, order_index: tar.order_index };
-      if (f.id === tar.id) return { ...f, order_index: cur.order_index };
+      if (f.id === cur.id) return { ...f, order: tar.order };
+      if (f.id === tar.id) return { ...f, order: cur.order };
       return f;
     }));
-    await supabase.from("arsiv").update({ order_index: tar.order_index }).eq("id", cur.id);
-    await supabase.from("arsiv").update({ order_index: cur.order_index }).eq("id", tar.id);
+    await supabase.from("arsiv").update({ order: tar.order }).eq("id", cur.id);
+    await supabase.from("arsiv").update({ order: cur.order }).eq("id", tar.id);
   };
 
   // ── KART LİSTE DEĞİŞTİRME ───────────────────────────────────────────────────
   const handleChangeCategory = async (newCatId: string) => {
     if (!changeCatTarget) return;
     const catFiles = files.filter(f => f.category === newCatId);
-    const maxIdx = catFiles.length > 0 ? Math.max(...catFiles.map(f => f.order_index)) : 0;
-    await supabase.from("arsiv").update({ category: newCatId, order_index: maxIdx + 1 }).eq("id", changeCatTarget.id);
+    const maxIdx = catFiles.length > 0 ? Math.max(...catFiles.map(f => f.order)) : 0;
+    await supabase.from("arsiv").update({ category: newCatId, order: maxIdx + 1 }).eq("id", changeCatTarget.id);
     setShowChangeCatModal(false); setChangeCatTarget(null);
     fetchAllData();
   };
@@ -425,19 +425,19 @@ export default function EmreBoard() {
         const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
         img = ud.publicUrl;
       }
-      let oi = editingItem.order_index;
+      let oi = editingItem.order;
       if (editCategory !== editingItem.category) {
         const cf = files.filter(f => f.category === editCategory);
-        oi = cf.length > 0 ? Math.max(...cf.map(f => f.order_index)) + 1 : 0;
+        oi = cf.length > 0 ? Math.max(...cf.map(f => f.order)) + 1 : 0;
       }
-      await supabase.from("arsiv").update({ title: editTitle.toUpperCase(), mega_url: editMegaUrl, image_url: img, category: editCategory, order_index: oi }).eq("id", editingItem.id);
+      await supabase.from("arsiv").update({ title: editTitle.toUpperCase(), mega_url: editMegaUrl, image_url: img, category: editCategory, order: oi }).eq("id", editingItem.id);
       setShowEditModal(false); fetchAllData();
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
   const handleCategoryRename = async (id: string, oldName: string) => {
     const n = prompt("Yeni isim:", oldName);
-    if (n) { await supabase.from("lists").update({ name: n }).eq("id", id); fetchAllData(); }
+    if (n) { await supabase.from("lists").update({ title: n }).eq("id", id); fetchAllData(); }
   };
   const deleteCategory = async (id: string) => { if (confirm("Silinsin mi?")) { await supabase.from("lists").delete().eq("id", id); fetchAllData(); } };
   const deleteFile = async (id: number) => { if (confirm("Kart silinsin mi?")) { await supabase.from("arsiv").delete().eq("id", id); fetchAllData(); } };
@@ -463,7 +463,7 @@ export default function EmreBoard() {
   const handleAddCategory = async () => {
     const name = prompt("Liste adı:");
     if (name) {
-      const maxIdx = categories.length > 0 ? Math.max(...categories.map(c => c.order_index || 0)) : 0;
+      const maxIdx = categories.length > 0 ? Math.max(...categories.map(c => c.order || 0)) : 0;
       await supabase.from("lists").insert([{ id: `cat-${Date.now()}`, title: name.trim(), order: maxIdx + 1 }]);
     }
   };
@@ -477,8 +477,8 @@ export default function EmreBoard() {
       await supabase.storage.from("arsiv-dosyalari").upload(fn, selectedFile);
       const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
       const cf = files.filter(f => f.category === targetCategoryId);
-      const maxIdx = cf.length > 0 ? Math.max(...cf.map(f => f.order_index)) : 0;
-      await supabase.from("arsiv").insert([{ title: title.toUpperCase(), mega_url: megaUrl, image_url: ud.publicUrl, category: targetCategoryId, order_index: maxIdx + 1 }]);
+      const maxIdx = cf.length > 0 ? Math.max(...cf.map(f => f.order)) : 0;
+      await supabase.from("arsiv").insert([{ title: title.toUpperCase(), mega_url: megaUrl, image_url: ud.publicUrl, category: targetCategoryId, order: maxIdx + 1 }]);
       setShowAddModal(false); setTitle(""); setMegaUrl(""); setSelectedFile(null); fetchAllData();
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
@@ -505,7 +505,7 @@ export default function EmreBoard() {
   };
 
   const getSortedCatFiles = (catId: string) =>
-    [...files.filter(f => f.category === catId)].sort((a, b) => a.order_index - b.order_index);
+    [...files.filter(f => f.category === catId)].sort((a, b) => a.order - b.order);
 
   const saveBg = (s: BackgroundSettings) => { setBackgroundSettings(s); localStorage.setItem("emre_board_bg_settings", JSON.stringify(s)); };
 
