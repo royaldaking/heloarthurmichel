@@ -793,24 +793,28 @@ const handleChangeList = async (newListId: string) => {
                     key={files.id}
                     className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
                   >
-                    {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
-                    <button ={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
-                      className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
-                      <ArrowLeftRight size={14}/>
-                    </button>
-                    <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => movefiles(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
-                      <button onClick={() => movefiles(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
-                    </div>
-                    <button onClick={() => handlefilesClick(cfiles)} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
-                      <img src={files.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
-                    </button>
-                    <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-                      <span className="truncate pr-2">{files.title}</span>
-                      {isAdmin && <button onClick={() => deletefiles(files.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
-                    </div>
-                  </div>
-                ))}
+                  {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
+
+{/* BURASI DÜZELDİ: onClick eklendi */}
+<button onClick={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
+  className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
+  <ArrowLeftRight size={14}/>
+</button>
+
+<div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
+  <button onClick={() => movefiles(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
+  <button onClick={() => movefiles(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
+</div>
+
+{/* BURASI DÜZELDİ: Linkin açılması için window.open eklendi */}
+<button onClick={() => { if(files.mega_url) window.open(files.mega_url, "_blank"); }} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
+  <img src={files.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+</button>
+
+<div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
+  <span className="truncate pr-2">{files.title}</span>
+  {isAdmin && <button onClick={() => deletefiles(files.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
+</div>
                 <button onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
               </div>
             </div>
