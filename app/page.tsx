@@ -35,7 +35,7 @@ interface LogEntry {
   title: string; 
   image_url: string; 
   user_name?: string; 
-  card_id?: number | null; 
+  file_id?: number | null; 
 }
 
 interface Message { 
@@ -71,25 +71,25 @@ export default function EmreBoard() {
   const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [showStatsDetail, setShowStatsDetail] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
-  const [editingCard, setEditingCard] = useState<Card | null>(null);
+  const [editingFile, setEditingFile] = useState<ArchiveItem | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editMegaUrl, setEditMegaUrl] = useState("");
   const [editFile, setEditFile] = useState<File | null>(null);
   const [editListId, setEditListId] = useState("");
 
   const [showChangeCatModal, setShowChangeCatModal] = useState(false);
-  const [changeCatTarget, setChangeCatTarget] = useState<Card | null>(null);
+  const [changeCatTarget, setChangeCatTarget] = useState<files | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // ── Global random card (floating dice button) ─────────────────────────────
-  const [randomCard, setRandomCard] = useState<Card | null>(null);
-  const [glowCardId, setGlowCardId] = useState<number | null>(null);
+ // --- STATE TANIMLAMALARI ---
+  const [randomFiles, setRandomFiles] = useState<ArchiveItem | null>(null); // 'files' değil 'ArchiveItem' olmalı
+  const [glowFilesId, setGlowFilesId] = useState<number | null>(null);
 
   const [targetListId, setTargetListId] = useState("");
   const [title, setTitle] = useState("");
   const [megaUrl, setMegaUrl] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // Bu resim seçmek içinse 'File' kalmalı
   const [loading, setLoading] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -103,12 +103,19 @@ export default function EmreBoard() {
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showSystemLogs, setShowSystemLogs] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
-  const [searchedUserData, setSearchedUserData] = useState<{ user: string; cards: Card[]; logs: LogEntry[] } | null>(null);
+  const [searchedUserData, setSearchedUserData] = useState<{ user: string; files: ArchiveItem[]; logs: LogEntry[] } | null>(null);
+  
   const [onlineUsers, setOnlineUsers] = useState<{ [key: string]: { online: boolean; last_seen: string } }>({});
+  
   const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
-    type: 'solid', solidColor: '#050505', gradientStart: '#050505',
-    gradientEnd: '#1a1a2e', gradientDirection: 'to bottom right',
-    imageUrl: '', blur: 0, opacity: 50
+    type: 'solid', 
+    solidColor: '#050505', 
+    gradientStart: '#050505',
+    gradientEnd: '#1a1a2e', 
+    gradientDirection: 'to bottom right',
+    imageUrl: '', 
+    blur: 0, 
+    opacity: 50
   });
 
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -238,27 +245,27 @@ export default function EmreBoard() {
   // ── LİSTE TAŞIMA — optimistik state ──────────────────────────────────────
   const moveList = async (index: number, direction: 'left' | 'right') => {
     const tIdx = direction === 'left' ? index - 1 : index + 1;
-    if (tIdx < 0 || tIdx >= lists.length) return;
-    const cur = lists[index];
-    const tar = lists[tIdx];
-    const updated = lists.map((l, i) => {
+    if (tIdx < 0 || tIdx >= categories.length) return;
+    const cur = categories[index];
+    const tar = categories[tIdx];
+    const updated = categories.map((l, i) => {
       if (i === index) return { ...l, order_index: tar.order_index };
       if (i === tIdx)  return { ...l, order_index: cur.order_index };
       return l;
     });
-    setLists([...updated].sort((a, b) => a.order_index - b.order_index));
+    setCategories([...updated].sort((a, b) => a.order_index - b.order_index));
    await supabase.from("kategoriler").update({ order_index: tar.order_index }).eq("id", cur.id);
    await supabase.from("kategoriler").update({ order_index: cur.order_index }).eq("id", tar.id);
   };
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
-  const moveCard = async (index: number, direction: 'up' | 'down', listId: string) => {
-    const listCards = [...files.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
+  const movefiles = async (index: number, direction: 'up' | 'down', listId: string) => {
+    const listfiles = [...files.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
     const tIdx = direction === 'up' ? index - 1 : index + 1;
-    if (tIdx < 0 || tIdx >= listCards.length) return;
-    const cur = listCards[index];
-    const tar = listCards[tIdx];
-    setCards(prev => prev.map(c => {
+    if (tIdx < 0 || tIdx >= listfiles.length) return;
+    const cur = listfiles[index];
+    const tar = listfiles[tIdx];
+    setfiles(prev => prev.map(c => {
       if (c.id === cur.id) return { ...c, order_index: tar.order_index };
       if (c.id === tar.id) return { ...c, order_index: cur.order_index };
       return c;
@@ -270,8 +277,8 @@ export default function EmreBoard() {
   // ── KART LİSTE DEĞİŞTİRME ────────────────────────────────────────────────
   const handleChangeList = async (newListId: string) => {
     if (!changeCatTarget) return;
-    const listCards = files.filter(c => c.list_id === newListId);
-    const maxIdx = listCards.length > 0 ? Math.max(...listCards.map(c => c.order_index)) : 0;
+    const listfiles = files.filter(c => c.list_id === newListId);
+    const maxIdx = listfiles.length > 0 ? Math.max(...listfiles.map(c => c.order_index)) : 0;
     await supabase.from("arsiv").update({ list_id: newListId, order_index: maxIdx + 1 }).eq("id", changeCatTarget.id);
     setShowChangeCatModal(false);
     setChangeCatTarget(null);
@@ -280,15 +287,15 @@ export default function EmreBoard() {
 
   // ── GLOBAL RASTGELE KART (sağ-alt buton) ─────────────────────────────────
   const pickGlobalRandom = () => {
-    if (cards.length === 0) return;
-    const picked = cards[Math.floor(Math.random() * cards.length)];
-    setRandomCard(picked);
-    setGlowCardId(picked.id);
+    if (files.length === 0) return;
+    const picked = files[Math.floor(Math.random() * files.length)];
+    setRandomfiles(picked);
+    setGlowfilesId(picked.id);
     setTimeout(() => {
-      const el = document.getElementById(`card-${picked.id}`);
+      const el = document.getElementById(`files-${picked.id}`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
-    setTimeout(() => setGlowCardId(null), 3000);
+    setTimeout(() => setGlowfilesId(null), 3000);
   };
 
   // ── ARKA PLAN DOSYA YÜKLEMESİ ────────────────────────────────────────────
@@ -363,7 +370,7 @@ export default function EmreBoard() {
     alert(`${target} eklendi!`);
   };
 
-  const handleCardClick = async (file: ArchiveItem) => {
+  const handlefilesClick = async (file: ArchiveItem) => {
     await supabase.from("logs").insert([{ 
         title: file.title, image_url: file.image_url, user_name: currentUserName, file_id: file.id
     }]);
@@ -390,13 +397,13 @@ export default function EmreBoard() {
   const getStats = () => {
     const m: { [k: string]: any } = {};
     logs.forEach(log => {
-      if (!log.card_id) return;
-      const id = log.card_id;
+      if (!log.files_id) return;
+      const id = log.files_id;
       if (!m[id]) m[id] = {
         id,
         title: log.title,
         image_url: log.image_url,
-        mega_url: cards.find(c => c.id === id)?.mega_url || "#",
+        mega_url: files.find(c => c.id === id)?.mega_url || "#",
         totalClicks: 0,
         users: {}
       };
@@ -409,9 +416,9 @@ export default function EmreBoard() {
     return Object.values(m).sort((a: any, b: any) => b.totalClicks - a.totalClicks);
   };
 
-  const deleteStatLogs = async (cardId: number | string) => {
+  const deleteStatLogs = async (filesId: number | string) => {
     if (!isAdmin || !confirm("Sıfırlansın mı?")) return;
-    const { error } = await supabase.from("logs").update({ card_id: null }).eq("card_id", cardId);
+    const { error } = await supabase.from("logs").update({ files_id: null }).eq("files_id", filesId);
     if (!error) fetchAllData();
   };
 
@@ -443,35 +450,35 @@ export default function EmreBoard() {
     if (matched) {
       setSearchedUserData({
         user: matched,
-        cards: files.filter(c => logs.some(l => l.card_id === c.id && l.user_name === matched)),
+        files: files.filter(c => logs.some(l => l.files_id === c.id && l.user_name === matched)),
         logs: logs.filter(l => l.user_name === matched)
       });
     } else { setSearchedUserData(null); alert("Kullanıcı bulunamadı!"); }
   };
 
-  const startEditing = (card: Card) => {
-    setEditingCard(card);
-    setEditTitle(card.title);
-    setEditMegaUrl(card.mega_url);
+  const startEditing = (files: files) => {
+    setEditingfiles(files);
+    setEditTitle(files.title);
+    setEditMegaUrl(files.mega_url);
     setEditFile(null);
-    setEditListId(card.list_id);
+    setEditListId(files.list_id);
     setShowEditModal(true);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingCard) return;
+    if (!editingfiles) return;
     setLoading(true);
     try {
-      let img = editingCard.image_url;
+      let img = editingfiles.image_url;
       if (editFile) {
-        const fn = `card-${Date.now()}-${editFile.name.replace(/\s/g, '-')}`;
+        const fn = `files-${Date.now()}-${editFile.name.replace(/\s/g, '-')}`;
         await supabase.storage.from("arsiv-dosyalari").upload(fn, editFile);
         const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
         img = ud.publicUrl;
       }
-      let oi = editingCard.order_index;
-      if (editListId !== editingCard.list_id) {
+      let oi = editingfiles.order_index;
+      if (editListId !== editingfiles.list_id) {
         const lc = files.filter(c => c.list_id === editListId);
         oi = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) + 1 : 0;
       }
@@ -481,7 +488,7 @@ export default function EmreBoard() {
         image_url: img,
         list_id: editListId,
         order_index: oi
-      }).eq("id", editingCard.id);
+      }).eq("id", editingfiles.id);
       setShowEditModal(false);
       fetchAllData();
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
@@ -496,7 +503,7 @@ export default function EmreBoard() {
     if (confirm("Silinsin mi?")) { await supabase.from("kategoriler").delete().eq("id", id); fetchAllData(); }
   };
 
-  const deleteCard = async (id: number) => {
+  const deletefiles = async (id: number) => {
     if (confirm("Kart silinsin mi?")) { await supabase.from("arsiv").delete().eq("id", id); fetchAllData(); }
   };
 
@@ -531,7 +538,7 @@ export default function EmreBoard() {
   const handleAddList = async () => {
     const name = prompt("Liste adı:");
     if (name) {
-      const maxIdx = lists.length > 0 ? Math.max(...lists.map(l => l.order_index || 0)) : 0;
+      const maxIdx = categories.length > 0 ? Math.max(...categories.map(l => l.order_index || 0)) : 0;
       await supabase.from("kategoriler").insert([{ id: `list-${Date.now()}`, title: name.trim(), order_index: maxIdx + 1 }]);
       fetchAllData();
     }
@@ -583,7 +590,7 @@ export default function EmreBoard() {
     return {};
   };
 
-  const getSortedListCards = (listId: string) =>
+  const getSortedListfiles = (listId: string) =>
     [...files.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
 
   const saveBg = (s: BackgroundSettings) => {
@@ -597,7 +604,7 @@ export default function EmreBoard() {
       0%,100%{box-shadow:0 0 8px 2px rgba(99,102,241,.4);border-color:rgba(99,102,241,.6);}
       50%{box-shadow:0 0 32px 10px rgba(99,102,241,.9),0 0 60px 20px rgba(165,180,252,.3);border-color:rgba(165,180,252,1);}
     }
-    .glow-card{animation:glowPulse .7s ease-in-out infinite;border-width:2px!important;}
+    .glow-files{animation:glowPulse .7s ease-in-out infinite;border-width:2px!important;}
   `;
 
   // ── LOGIN ──────────────────────────────────────────────────────────────────
@@ -725,8 +732,8 @@ export default function EmreBoard() {
         onMouseMove={handleMouseMove}
         className={`flex-1 overflow-x-auto custom-scrollbar flex items-start p-6 md:p-10 gap-6 md:gap-8 h-full transition-all duration-500 relative z-10 ${!isSidebarOpen ? 'md:pl-24' : ''} ${isDragging ? 'cursor-grabbing select-none' : 'cursor-default'}`}
       >
-        {lists.map((list, listIdx) => {
-          const listCards = getSortedListCards(list.id);
+        {categories.map((list, listIdx) => {
+          const listfiles = getSortedListfiles(list.id);
           return (
             <div key={list.id} className="w-[260px] md:w-[340px] shrink-0 bg-zinc-900/70 backdrop-blur-md border border-white/5 rounded-[2.5rem] flex flex-col max-h-[85vh] relative shadow-2xl">
               <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
@@ -735,7 +742,7 @@ export default function EmreBoard() {
                     className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
                     <ChevronLeft size={14}/>
                   </button>
-                  <button onClick={() => moveList(listIdx, 'right')} disabled={listIdx === lists.length - 1}
+                  <button onClick={() => moveList(listIdx, 'right')} disabled={listIdx === categories.length - 1}
                     className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
                     <ChevronRight size={14}/>
                   </button>
@@ -749,27 +756,27 @@ export default function EmreBoard() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
-                {listCards.map((card, idx) => (
+                {listfiless.map((files, idx) => (
                   <div
-                    id={`card-${card.id}`}
-                    key={card.id}
-                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowCardId === card.id ? 'glow-card border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
+                    id={`files-${files.id}`}
+                    key={files.id}
+                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowfilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
                   >
-                    {isAdmin && <button onClick={() => startEditing(card)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
-                    <button onClick={() => { setChangeCatTarget(card); setShowChangeCatModal(true); }}
+                    {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
+                    <button onClick={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
                       className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
                       <ArrowLeftRight size={14}/>
                     </button>
                     <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => moveCard(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
-                      <button onClick={() => moveCard(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
+                      <button onClick={() => movefiles(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
+                      <button onClick={() => movefiles(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
                     </div>
-                    <button onClick={() => handleCardClick(card)} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
-                      <img src={card.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+                    <button onClick={() => handlefilesClick(cfiles)} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
+                      <img src={files.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
                     </button>
                     <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-                      <span className="truncate pr-2">{card.title}</span>
-                      {isAdmin && <button onClick={() => deleteCard(card.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
+                      <span className="truncate pr-2">{files.title}</span>
+                      {isAdmin && <button onClick={() => deletefiles(files.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
                     </div>
                   </div>
                 ))}
@@ -787,7 +794,7 @@ export default function EmreBoard() {
             <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3"><ArrowLeftRight size={22}/> Liste Değiştir</h2>
             <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">"{changeCatTarget.title}" kartını taşı</p>
             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
-              {lists.filter(l => l.id !== changeCatTarget.list_id).map(list => (
+              {categories.filter(l => l.id !== changeCatTarget.list_id).map(list => (
                 <button key={list.id} onClick={() => handleChangeList(list.id)}
                   className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all">{list.title}</button>
               ))}
@@ -829,7 +836,7 @@ export default function EmreBoard() {
                   <div>
                     <h3 className="text-2xl font-black uppercase italic">{searchedUserData.user}</h3>
                     <p className={`text-sm font-bold ${isUserOnline(searchedUserData.user) ? 'text-green-400' : 'text-zinc-500'}`}>{getLastSeen(searchedUserData.user)}</p>
-                    <p className="text-xs text-zinc-600 mt-2">{searchedUserData.logs.length} aktivite | {searchedUserData.cards.length} kart tıklamış</p>
+                    <p className="text-xs text-zinc-600 mt-2">{searchedUserData.logs.length} aktivite | {searchedUserData.files.length} kart tıklamış</p>
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -1005,7 +1012,7 @@ export default function EmreBoard() {
       )}
 
       {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
-      {showEditModal && editingCard && (
+      {showEditModal && editingfiles && (
         <div className="fixed inset-0 z-[1100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-lg bg-zinc-900 border border-blue-600/30 p-8 rounded-[3rem] shadow-4xl">
             <h2 className="text-2xl font-black italic uppercase mb-6 text-blue-500 flex items-center gap-3"><Edit3/> Düzenle</h2>
@@ -1015,12 +1022,12 @@ export default function EmreBoard() {
               <div>
                 <label className="text-[9px] font-bold text-zinc-500 uppercase mb-1 block">Liste</label>
                 <select value={editListId} onChange={e => setEditListId(e.target.value)} className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600">
-                  {lists.map(list => <option key={list.id} value={list.id}>{list.title}</option>)}
+                  {categories.map(list => <option key={list.id} value={list.id}>{list.title}</option>)}
                 </select>
               </div>
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <img src={editFile ? URL.createObjectURL(editFile) : editingCard.image_url} className="w-20 h-20 object-contain rounded-xl border border-white/10" alt=""/>
+                  <img src={editFile ? URL.createObjectURL(editFile) : editingfiles.image_url} className="w-20 h-20 object-contain rounded-xl border border-white/10" alt=""/>
                   <div className="flex-1">
                     <p className="text-[9px] font-bold text-zinc-500 uppercase mb-1">Görsel Değiştir</p>
                     <p className="text-[9px] font-bold text-blue-400 mb-2">💡 Ctrl+V ile yapıştır</p>
@@ -1222,8 +1229,8 @@ export default function EmreBoard() {
                 {[
                   { val: logs.length, label: 'Toplam Log', color: 'text-blue-500' },
                   { val: getVisibleUsers().length, label: 'Kullanıcı', color: 'text-green-500' },
-                  { val: cards.length, label: 'Kart', color: 'text-purple-500' },
-                  { val: lists.length, label: 'Liste', color: 'text-orange-500' }
+                  { val: files.length, label: 'Kart', color: 'text-purple-500' },
+                  { val: categories.length, label: 'Liste', color: 'text-orange-500' }
                 ].map(({ val, label, color }) => (
                   <div key={label} className="bg-zinc-900/60 border border-white/10 rounded-2xl p-6 text-center">
                     <p className={`text-4xl font-black ${color}`}>{val}</p>
@@ -1242,7 +1249,7 @@ export default function EmreBoard() {
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-[9px] font-bold text-blue-400 bg-blue-600/20 px-2 py-0.5 rounded-full">{log.user_name || 'Anonim'}</span>
                           <span className="text-[9px] font-bold text-zinc-500">{new Date(log.created_at).toLocaleString('tr-TR')}</span>
-                          {log.card_id && <span className="text-[9px] font-bold text-zinc-600">ID:{log.card_id}</span>}
+                          {log.files_id && <span className="text-[9px] font-bold text-zinc-600">ID:{log.files_id}</span>}
                         </div>
                       </div>
                     </div>
@@ -1255,15 +1262,15 @@ export default function EmreBoard() {
       )}
 
       {/* ŞANSLI KART MODAL */}
-      {randomCard && (
-        <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomCard(null)}>
+      {randomfiles && (
+        <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomfiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
-            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4"><img src={randomCard.image_url} className="w-full h-full object-contain" alt="" /></div>
+            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4"><img src={randomfiles.image_url} className="w-full h-full object-contain" alt="" /></div>
             <div className="text-center pb-6">
-              <h2 className="text-3xl font-black italic uppercase mb-8">{randomCard.title}</h2>
+              <h2 className="text-3xl font-black italic uppercase mb-8">{randomfiles.title}</h2>
               <div className="flex gap-4 px-6">
-                <button onClick={() => setRandomCard(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
-                <button onClick={() => handleCardClick(randomCard)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
+                <button onClick={() => setRandomfiles(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
+                <button onClick={() => handlefilesClick(randomfiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
               </div>
             </div>
           </div>
