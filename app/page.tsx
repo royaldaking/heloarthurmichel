@@ -296,7 +296,7 @@ export default function EmreBoard() {
     if (files.length === 0) return;
     const picked = files[Math.floor(Math.random() * files.length)];
     setRandomFiles(picked);
-    setGlowfilesId(picked.id);
+    setGlowFilesId(picked.id);
     setTimeout(() => {
       const el = document.getElementById(`files-${picked.id}`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -766,7 +766,7 @@ export default function EmreBoard() {
                   <div
                     id={`files-${files.id}`}
                     key={files.id}
-                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowfilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
+                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
                   >
                     {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
                     <button onClick={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
