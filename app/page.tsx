@@ -795,16 +795,50 @@ const handleChangeList = async (newListId: string) => {
                   >
                   {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
 
-{/* BURASI DÜZELDİ: onClick eklendi */}
-<button onClick={() => { setChangeCatTarget(files); setShowChangeCatModal(true); }}
-  className="absolute top-3 left-12 z-30 bg-purple-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all" title="Listeyi Değiştir">
-  <ArrowLeftRight size={14}/>
-</button>
+{/* KART İÇERİĞİ SARMALAYICI BİTİŞİ (Eksik olan buydu) */}
+                </div> 
 
-<div className="absolute top-2 left-2 flex flex-col gap-1 z-20 opacity-0 group-hover:opacity-100 transition-all">
-  <button onClick={() => movefiles(idx, 'up', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronUp size={12}/></button>
-  <button onClick={() => movefiles(idx, 'down', list.id)} className="bg-black/80 p-1 rounded-md hover:bg-blue-600 active:scale-90"><ChevronDown size={12}/></button>
-</div>
+                <button 
+                  onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} 
+                  className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase"
+                >
+                  + Kart Ekle
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── LİSTE DEĞİŞTİR MODAL ─────────────────────────────────────────── */}
+        {showChangeCatModal && changeCatTarget && (
+          <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
+            <div className="w-full max-w-sm bg-zinc-900 border border-purple-600/30 p-8 rounded-[3rem] shadow-4xl">
+              <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3">
+                <ArrowLeftRight size={22}/> Liste Değiştir
+              </h2>
+              <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">
+                "{changeCatTarget.title}" kartını taşı
+              </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
+                {categories.filter(l => l.id !== changeCatTarget.category).map(list => (
+                  <button 
+                    key={list.id} 
+                    onClick={() => handleChangeList(list.id)}
+                    className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all"
+                  >
+                    {list.title}
+                  </button>
+                ))}
+              </div>
+              <button 
+                onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }} 
+                className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        )}
 
 {/* BURASI DÜZELDİ: Linkin açılması için window.open eklendi */}
 <button onClick={() => { if(files.mega_url) window.open(files.mega_url, "_blank"); }} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
