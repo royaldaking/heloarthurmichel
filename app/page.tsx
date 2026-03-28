@@ -464,8 +464,7 @@ export default function EmreBoard() {
     const name = prompt("Liste adı:");
     if (name) {
       const maxIdx = categories.length > 0 ? Math.max(...categories.map(c => c.order_index || 0)) : 0;
-      await supabase.from("lists").insert([{ id: `cat-${Date.now()}`, name: name.trim(), order_index: maxIdx + 1 }]);
-      fetchAllData();
+      await supabase.from("lists").insert([{ id: `cat-${Date.now()}`, title: name.trim(), order: maxIdx + 1 }]);
     }
   };
 
