@@ -45,6 +45,9 @@ interface Message {
   receiver_name: string; 
   text: string; 
 }
+export default function EmreBoard() {
+  // --- EKSİK OLAN SESSION STATE BURADA ---
+  const [session, setSession] = useState<any>(null);
 
   // ── Ana veri ──────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<List[]>([]);
