@@ -6,7 +6,7 @@ import {
   LogOut, Lock, Mail, Tag, BarChart3, ShieldAlert, Edit3, ExternalLink, User,
   Image as ImageIcon, MessageCircle, UserPlus, Send, Search, Clock, Settings,
   Palette, Paintbrush, Eye, ChevronRight, ArrowLeftRight,
-  Upload, Camera, RefreshCw, Dices
+  Upload, Camera, RefreshCw, Dices, Users
 } from "lucide-react";
 
 const supabaseUrl = "https://wobnwchodzgsofpybztg.supabase.co";
@@ -17,7 +17,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 interface Category { 
   id: string; 
   title: string; 
-  order_index: number; // order -> order_index oldu
+  order_index: number;
 }
 
 interface ArchiveItem { 
@@ -26,7 +26,7 @@ interface ArchiveItem {
   mega_url: string; 
   image_url: string; 
   category: string; 
-  order_index: number; // order -> order_index oldu
+  order_index: number;
 }
 
 interface LogEntry { 
@@ -45,17 +45,29 @@ interface Message {
   receiver_name: string; 
   text: string; 
 }
+
+interface BackgroundSettings {
+  type: 'solid' | 'gradient' | 'image';
+  solidColor: string;
+  gradientStart: string;
+  gradientEnd: string;
+  gradientDirection: string;
+  imageUrl: string;
+  blur: number;
+  opacity: number;
+}
+
 export default function EmreBoard() {
-  // --- EKSİK OLAN SESSION STATE BURADA ---
+  // ── AUTH STATE ────────────────────────────────────────────────────────────
   const [session, setSession] = useState<any>(null);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login'); // Bunu tam buraya ekle
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  // Eğer hata verirse diye şunları da sağlama alalım:
-  const [error, setError] = useState<string | null>(null);
-  // ── Ana veri ──────────────────────────────────────────────────────────────
+
+  // ── ANA VERİ ──────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<Category[]>([]);
   const [files, setFiles] = useState<ArchiveItem[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -64,7 +76,7 @@ export default function EmreBoard() {
   const [userProfiles, setUserProfiles] = useState<{ [key: string]: string }>({});
   const [friends, setFriends] = useState<string[]>([]);
 
-  // ── Sohbet ────────────────────────────────────────────────────────────────
+  // ── SOHBET ────────────────────────────────────────────────────────────────
   const [activeChatFriend, setActiveChatFriend] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -72,30 +84,38 @@ export default function EmreBoard() {
   const [searchFriendName, setSearchFriendName] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // ── MODALLER VE PANELLERİ ─────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [showStatsDetail, setShowStatsDetail] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
+  const [showFriendsPanel, setShowFriendsPanel] = useState(false);
+
+  // ── DÜZENLEME STATE ───────────────────────────────────────────────────────
   const [editingFile, setEditingFile] = useState<ArchiveItem | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editMegaUrl, setEditMegaUrl] = useState("");
   const [editFile, setEditFile] = useState<File | null>(null);
-  const [editId, setEditListId] = useState("");
+  const [editListId, setEditListId] = useState("");
+
+  // ── INLINE EDIT STATE (Kategori ismi düzenleme) ───────────────────────────
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryTitle, setEditingCategoryTitle] = useState("");
 
   const [showChangeCatModal, setShowChangeCatModal] = useState(false);
-  const [changeCatTarget, setChangeCatTarget] = useState<files | null>(null);
+  const [changeCatTarget, setChangeCatTarget] = useState<ArchiveItem | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
- // --- STATE TANIMLAMALARI ---
-  const [randomFiles, setRandomFiles] = useState<ArchiveItem | null>(null); // 'files' değil 'ArchiveItem' olmalı
+  // ── RANDOM FILES STATE ────────────────────────────────────────────────────
+  const [randomFiles, setRandomFiles] = useState<ArchiveItem | null>(null);
   const [glowFilesId, setGlowFilesId] = useState<number | null>(null);
 
   const [targetListId, setTargetListId] = useState("");
   const [title, setTitle] = useState("");
   const [megaUrl, setMegaUrl] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null); // Bu resim seçmek içinse 'File' kalmalı
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -213,7 +233,6 @@ export default function EmreBoard() {
   }, [showChatPanel, activeChatFriend, currentUserName]);
 
   // ── OTOMATİK ARKADAŞ EKLEMESİ ────────────────────────────────────────────
-  // Bana mesaj gönderen kullanıcı otomatik arkadaş listesine eklenir
   useEffect(() => {
     if (!session || !currentUserName) return;
     const ch = supabase.channel(`inbox:${currentUserName}`)
@@ -235,45 +254,45 @@ export default function EmreBoard() {
 
   // ── VERİ ÇEKME ────────────────────────────────────────────────────────────
   async function fetchAllData() {
-    // Kategorileri id'ye göre veya varsa kendi order_index'ine göre çekebilirsin
     const { data: catData } = await supabase.from("kategoriler").select("*").order("order_index", { ascending: true });
     if (catData) setCategories(catData as Category[]);
 
-    // Arşivi senin eklediğin order_index sütununa göre çekiyoruz
     const { data: fileData } = await supabase.from("arsiv").select("*").order("order_index", { ascending: true });
     if (fileData) setFiles(fileData as ArchiveItem[]);
 
-    // Loglar her zaman en yeni en üstte olacak şekilde kalsın (id veya created_at)
     const { data: logData } = await supabase.from("logs").select("*").order("id", { ascending: false });
     if (logData) setLogs(logData as LogEntry[]);
   }
 
-  // ── LİSTE TAŞIMA — optimistik state ──────────────────────────────────────
-  const moveList = async (index: number, direction: 'left' | 'right') => {
+  // ── KATEGORİ TAŞIMA (sol/sağ) ─────────────────────────────────────────────
+  const moveCategory = async (id: string, direction: 'left' | 'right') => {
+    const index = categories.findIndex(c => c.id === id);
+    if (index === -1) return;
     const tIdx = direction === 'left' ? index - 1 : index + 1;
     if (tIdx < 0 || tIdx >= categories.length) return;
+    
     const cur = categories[index];
     const tar = categories[tIdx];
     const updated = categories.map((l, i) => {
       if (i === index) return { ...l, order_index: tar.order_index };
-      if (i === tIdx)  return { ...l, order_index: cur.order_index };
+      if (i === tIdx) return { ...l, order_index: cur.order_index };
       return l;
     });
     setCategories([...updated].sort((a, b) => a.order_index - b.order_index));
-   await supabase.from("kategoriler").update({ order_index: tar.order_index }).eq("id", cur.id);
-   await supabase.from("kategoriler").update({ order_index: cur.order_index }).eq("id", tar.id);
+    await supabase.from("kategoriler").update({ order_index: tar.order_index }).eq("id", cur.id);
+    await supabase.from("kategoriler").update({ order_index: cur.order_index }).eq("id", tar.id);
   };
 
-  // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
-  const movefiles = async (index: number, direction: 'up' | 'down', listId: string) => {
-   const listfiles = files
-  .filter(c => String(c.category) === String(listId))
-  .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  // ── KART SIRALAMA ─────────────────────────────────────────────────────────
+  const moveFiles = async (index: number, direction: 'up' | 'down', listId: string) => {
+    const listFiles = files
+      .filter(c => String(c.category) === String(listId))
+      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
     const tIdx = direction === 'up' ? index - 1 : index + 1;
-    if (tIdx < 0 || tIdx >= listfiles.length) return;
-    const cur = listfiles[index];
-    const tar = listfiles[tIdx];
-    setfiles(prev => prev.map(c => {
+    if (tIdx < 0 || tIdx >= listFiles.length) return;
+    const cur = listFiles[index];
+    const tar = listFiles[tIdx];
+    setFiles(prev => prev.map(c => {
       if (c.id === cur.id) return { ...c, order_index: tar.order_index };
       if (c.id === tar.id) return { ...c, order_index: cur.order_index };
       return c;
@@ -283,40 +302,31 @@ export default function EmreBoard() {
   };
 
   // ── KART LİSTE DEĞİŞTİRME ────────────────────────────────────────────────
-const handleChangeList = async (newListId: string) => {
-  if (!changeCatTarget) return;
+  const handleChangeList = async (newListId: string) => {
+    if (!changeCatTarget) return;
+    const targetCategoryFiles = files.filter(c => String(c.category) === String(newListId));
+    const maxIdx = targetCategoryFiles.length > 0 
+      ? Math.max(...targetCategoryFiles.map(c => c.order_index || 0)) 
+      : 0;
 
-  // 1. Hedef kategorideki dosyaları filtrele (Sıralama için en büyük index'i bulacağız)
-  const targetCategoryFiles = files.filter(c => String(c.category) === String(newListId));
-  
-  // 2. Yeni kategoride en sona eklemek için max index'i hesapla
-  const maxIdx = targetCategoryFiles.length > 0 
-    ? Math.max(...targetCategoryFiles.map(c => c.order_index || 0)) 
-    : 0;
+    const { error } = await supabase
+      .from("arsiv")
+      .update({ 
+        category: newListId,
+        order_index: maxIdx + 1 
+      })
+      .eq("id", changeCatTarget.id);
 
-  // 3. Supabase'i güncelle (list_id bitti, artık category sütununa newListId yani kategori adını yazıyoruz)
-  const { error } = await supabase
-    .from("arsiv")
-    .update({ 
-      category: newListId, // Burası 'category' olmalı
-      order_index: maxIdx + 1 
-    })
-    .eq("id", changeCatTarget.id);
+    if (error) {
+      console.error("Tasima hatasi:", error.message);
+      return;
+    }
+    setShowChangeCatModal(false);
+    setChangeCatTarget(null);
+    await fetchAllData();
+  };
 
-  if (error) {
-    console.error("Taşıma hatası:", error.message);
-    return;
-  }
-
-  // 4. State'i ve Modalı kapat
-  setShowChangeCatModal(false);
-  setChangeCatTarget(null);
-  
-  // 5. Verileri tazele (Bu sayede Mega linkleri ve yeni sıralama anında düzelir)
-  await fetchAllData();
-};
-
-  // ── GLOBAL RASTGELE KART (sağ-alt buton) ─────────────────────────────────
+  // ── GLOBAL RASTGELE KART ──────────────────────────────────────────────────
   const pickGlobalRandom = () => {
     if (files.length === 0) return;
     const picked = files[Math.floor(Math.random() * files.length)];
@@ -370,7 +380,7 @@ const handleChangeList = async (newListId: string) => {
       setUserProfiles(np);
       localStorage.setItem("emre_board_profiles", JSON.stringify(np));
       setShowProfileEdit(false); setNewDisplayName(""); setNewProfileFile(null);
-      alert("Profil güncellendi! Değişikliklerin görünmesi için sayfayı yenileyin.");
+      alert("Profil guncellendi! Degisikliklerin gorunmesi icin sayfayi yenileyin.");
     } catch (err: any) { alert(err.message); } finally { setProfileLoading(false); }
   };
 
@@ -383,7 +393,7 @@ const handleChangeList = async (newListId: string) => {
       receiver_name: activeChatFriend,
       text: newMessage.trim()
     }]);
-    if (error) { console.error(error); alert("Mesaj gönderilemedi."); }
+    if (error) { console.error(error); alert("Mesaj gonderilemedi."); }
     else setNewMessage("");
   };
 
@@ -393,7 +403,7 @@ const handleChangeList = async (newListId: string) => {
     if (target === currentUserName) { alert("Kendini ekleyemezsin!"); return; }
     if (friends.includes(target)) { alert("Zaten ekli!"); return; }
     const { data: uc } = await supabase.from("logs").select("user_name").eq("user_name", target).limit(1);
-    if (!uc || uc.length === 0) { alert("Kullanıcı bulunamadı veya henüz aktivite yok."); return; }
+    if (!uc || uc.length === 0) { alert("Kullanici bulunamadi veya henuz aktivite yok."); return; }
     const nf = [...friends, target];
     setFriends(nf);
     localStorage.setItem("emre_board_friends", JSON.stringify(nf));
@@ -401,9 +411,9 @@ const handleChangeList = async (newListId: string) => {
     alert(`${target} eklendi!`);
   };
 
-  const handlefilesClick = async (file: ArchiveItem) => {
+  const handleFilesClick = async (file: ArchiveItem) => {
     await supabase.from("logs").insert([{ 
-        title: file.title, image_url: file.image_url, user_name: currentUserName, file_id: file.id
+      title: file.title, image_url: file.image_url, user_name: currentUserName, file_id: file.id
     }]);
     fetchAllData();
     window.open(file.mega_url, "_blank");
@@ -420,16 +430,16 @@ const handleChangeList = async (newListId: string) => {
       const newProfiles = { ...userProfiles, [uName]: urlData.publicUrl };
       setUserProfiles(newProfiles);
       localStorage.setItem("emre_board_profiles", JSON.stringify(newProfiles));
-      alert("Profil fotoğrafı güncellendi!");
+      alert("Profil fotografi guncellendi!");
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
-  // ── İSTATİSTİK — card_id üzerinden hesapla ───────────────────────────────
+  // ── İSTATİSTİK ────────────────────────────────────────────────────────────
   const getStats = () => {
     const m: { [k: string]: any } = {};
     logs.forEach(log => {
-      if (!log.files_id) return;
-      const id = log.files_id;
+      if (!log.file_id) return;
+      const id = log.file_id;
       if (!m[id]) m[id] = {
         id,
         title: log.title,
@@ -447,27 +457,27 @@ const handleChangeList = async (newListId: string) => {
     return Object.values(m).sort((a: any, b: any) => b.totalClicks - a.totalClicks);
   };
 
-  const deleteStatLogs = async (filesId: number | string) => {
-    if (!isAdmin || !confirm("Sıfırlansın mı?")) return;
-    const { error } = await supabase.from("logs").update({ files_id: null }).eq("files_id", filesId);
+  const deleteStatLogs = async (fileId: number | string) => {
+    if (!isAdmin || !confirm("Sifirlansin mi?")) return;
+    const { error } = await supabase.from("logs").update({ file_id: null }).eq("file_id", fileId);
     if (!error) fetchAllData();
   };
 
   const toggleAdminPower = () => {
-    if (!isAdmin) { const p = prompt("Admin Şifresi:"); if (p === "Emre_2013") setIsAdmin(true); else alert("Hatalı!"); }
+    if (!isAdmin) { const p = prompt("Admin Sifresi:"); if (p === "Emre_2013") setIsAdmin(true); else alert("Hatali!"); }
     else setIsAdmin(false);
   };
 
   const getLastSeen = (u: string) => {
     const s = onlineUsers[u];
-    if (s?.online) return "Çevrimiçi";
+    if (s?.online) return "Cevrimici";
     if (s?.last_seen) {
       const diff = Date.now() - new Date(s.last_seen).getTime();
       const m = Math.floor(diff / 60000);
-      if (m < 1) return "Az önce";
-      if (m < 60) return `${m} dk önce`;
+      if (m < 1) return "Az once";
+      if (m < 60) return `${m} dk once`;
       const h = Math.floor(m / 60);
-      if (h < 24) return `${h} saat önce`;
+      if (h < 24) return `${h} saat once`;
       return new Date(s.last_seen).toLocaleDateString('tr-TR');
     }
     return "Bilinmiyor";
@@ -481,35 +491,36 @@ const handleChangeList = async (newListId: string) => {
     if (matched) {
       setSearchedUserData({
         user: matched,
-        files: files.filter(c => logs.some(l => l.files_id === c.id && l.user_name === matched)),
+        files: files.filter(c => logs.some(l => l.file_id === c.id && l.user_name === matched)),
         logs: logs.filter(l => l.user_name === matched)
       });
-    } else { setSearchedUserData(null); alert("Kullanıcı bulunamadı!"); }
+    } else { setSearchedUserData(null); alert("Kullanici bulunamadi!"); }
   };
 
-  const startEditing = (files: files) => {
-    setEditingfiles(files);
-    setEditTitle(files.title);
-    setEditMegaUrl(files.mega_url);
+  // ── KART DÜZENLEME BAŞLAT ─────────────────────────────────────────────────
+  const startEditing = (file: ArchiveItem) => {
+    setEditingFile(file);
+    setEditTitle(file.title);
+    setEditMegaUrl(file.mega_url);
     setEditFile(null);
-    setEditListId(files.category);
+    setEditListId(file.category);
     setShowEditModal(true);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingfiles) return;
+    if (!editingFile) return;
     setLoading(true);
     try {
-      let img = editingfiles.image_url;
+      let img = editingFile.image_url;
       if (editFile) {
         const fn = `files-${Date.now()}-${editFile.name.replace(/\s/g, '-')}`;
         await supabase.storage.from("arsiv-dosyalari").upload(fn, editFile);
         const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
         img = ud.publicUrl;
       }
-      let oi = editingfiles.order_index;
-      if (editListId !== editingfiles.category) {
+      let oi = editingFile.order_index;
+      if (editListId !== editingFile.category) {
         const lc = files.filter(c => c.category === editListId);
         oi = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) + 1 : 0;
       }
@@ -519,10 +530,33 @@ const handleChangeList = async (newListId: string) => {
         image_url: img,
         category: editListId,
         order_index: oi
-      }).eq("id", editingfiles.id);
+      }).eq("id", editingFile.id);
       setShowEditModal(false);
       fetchAllData();
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
+  };
+
+  // ── KATEGORİ INLINE DÜZENLEME ─────────────────────────────────────────────
+  const startCategoryEdit = (cat: Category) => {
+    setEditingCategoryId(cat.id);
+    setEditingCategoryTitle(cat.title);
+  };
+
+  const saveCategoryEdit = async () => {
+    if (!editingCategoryId || !editingCategoryTitle.trim()) {
+      setEditingCategoryId(null);
+      setEditingCategoryTitle("");
+      return;
+    }
+    await supabase.from("kategoriler").update({ title: editingCategoryTitle.trim() }).eq("id", editingCategoryId);
+    setEditingCategoryId(null);
+    setEditingCategoryTitle("");
+    fetchAllData();
+  };
+
+  const cancelCategoryEdit = () => {
+    setEditingCategoryId(null);
+    setEditingCategoryTitle("");
   };
 
   const handleListRename = async (id: string, oldTitle: string) => {
@@ -534,7 +568,7 @@ const handleChangeList = async (newListId: string) => {
     if (confirm("Silinsin mi?")) { await supabase.from("kategoriler").delete().eq("id", id); fetchAllData(); }
   };
 
-  const deletefiles = async (id: number) => {
+  const deleteFiles = async (id: number) => {
     if (confirm("Kart silinsin mi?")) { await supabase.from("arsiv").delete().eq("id", id); fetchAllData(); }
   };
 
@@ -545,7 +579,7 @@ const handleChangeList = async (newListId: string) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        if (!username.trim()) { alert("Kullanıcı adı gerekli!"); setAuthLoading(false); return; }
+        if (!username.trim()) { alert("Kullanici adi gerekli!"); setAuthLoading(false); return; }
         const { error } = await supabase.auth.signUp({
           email, password,
           options: { data: { display_name: username, avatar_url: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` } }
@@ -556,18 +590,18 @@ const handleChangeList = async (newListId: string) => {
           setUserProfiles(np);
           localStorage.setItem("emre_board_profiles", JSON.stringify(np));
         }
-        alert("Kayıt başarılı!");
+        alert("Kayit basarili!");
         setAuthMode('login'); setUsername(""); setAvatarUrl("");
       }
     } catch (err: any) { alert(err.message); } finally { setAuthLoading(false); }
   };
 
   const handleSignOut = async () => {
-    if (confirm("Çıkış?")) { await supabase.auth.signOut(); setSession(null); }
+    if (confirm("Cikis?")) { await supabase.auth.signOut(); setSession(null); }
   };
 
   const handleAddList = async () => {
-    const name = prompt("Liste adı:");
+    const name = prompt("Liste adi:");
     if (name) {
       const maxIdx = categories.length > 0 ? Math.max(...categories.map(l => l.order_index || 0)) : 0;
       await supabase.from("kategoriler").insert([{ id: `list-${Date.now()}`, title: name.trim(), order_index: maxIdx + 1 }]);
@@ -575,7 +609,7 @@ const handleChangeList = async (newListId: string) => {
     }
   };
 
-  // ── KART YÜKLEMESİ — category kullan ─────────────────────────────────────
+  // ── KART YÜKLEMESİ ────────────────────────────────────────────────────────
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile || !title || !megaUrl || !targetListId) return alert("Eksik alan var!");
@@ -621,7 +655,7 @@ const handleChangeList = async (newListId: string) => {
     return {};
   };
 
-  const getSortedListfiles = (listId: string) =>
+  const getSortedListFiles = (listId: string) =>
     [...files.filter(c => c.category === listId)].sort((a, b) => a.order_index - b.order_index);
 
   const saveBg = (s: BackgroundSettings) => {
@@ -644,31 +678,33 @@ const handleChangeList = async (newListId: string) => {
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-600/20 rounded-full blur-[120px]"/>
       <div className="w-full max-w-md bg-zinc-900/50 border border-white/10 backdrop-blur-xl p-10 rounded-[3rem] z-10 text-center">
         <h1 className="text-3xl font-black italic tracking-tighter uppercase mb-2">Emre <span className="text-blue-600">Board</span></h1>
-        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-10">{authMode === 'login' ? 'Giriş' : 'Kayıt'}</p>
+        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-10">{authMode === 'login' ? 'Giris' : 'Kayit'}</p>
         <form onSubmit={handleAuth} className="space-y-4 text-left">
-          {authMode === 'signup' && (<>
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-24 h-24 rounded-full bg-zinc-800 border-2 border-dashed border-zinc-600 flex items-center justify-center overflow-hidden mb-3">
-                {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover"/> : <User size={32} className="text-zinc-500"/>}
+          {authMode === 'signup' && (
+            <>
+              <div className="flex flex-col items-center mb-6">
+                <div className="w-24 h-24 rounded-full bg-zinc-800 border-2 border-dashed border-zinc-600 flex items-center justify-center overflow-hidden mb-3">
+                  {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover"/> : <User size={32} className="text-zinc-500"/>}
+                </div>
+                <input type="url" placeholder="Profil fotografi URL" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-3 rounded-xl text-[10px] font-bold outline-none focus:border-blue-600 text-center"/>
+                <div className="flex gap-2 flex-wrap justify-center mt-3">
+                  {['Felix','Aneka','Max','Luna','Shadow','Storm'].map((seed, i) => {
+                    const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+                    return <button key={i} type="button" onClick={() => setAvatarUrl(url)} className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all ${avatarUrl === url ? 'border-blue-500 scale-110' : 'border-transparent hover:border-zinc-500'}`}><img src={url} alt="" className="w-full h-full object-cover bg-zinc-700"/></button>;
+                  })}
+                </div>
               </div>
-              <input type="url" placeholder="Profil fotoğrafı URL" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-3 rounded-xl text-[10px] font-bold outline-none focus:border-blue-600 text-center"/>
-              <div className="flex gap-2 flex-wrap justify-center mt-3">
-                {['Felix','Aneka','Max','Luna','Shadow','Storm'].map((seed, i) => {
-                  const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
-                  return <button key={i} type="button" onClick={() => setAvatarUrl(url)} className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all ${avatarUrl === url ? 'border-blue-500 scale-110' : 'border-transparent hover:border-zinc-500'}`}><img src={url} alt="" className="w-full h-full object-cover bg-zinc-700"/></button>;
-                })}
-              </div>
-            </div>
-            <div className="relative"><Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
-              <input type="text" placeholder="KULLANICI ADI" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
-          </>)}
+              <div className="relative"><Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
+                <input type="text" placeholder="KULLANICI ADI" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
+            </>
+          )}
           <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
             <input type="email" placeholder="E-POSTA" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
           <div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
-            <input type="password" placeholder="ŞİFRE" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
-          <button type="submit" disabled={authLoading} className="w-full bg-blue-600 font-black py-5 rounded-2xl uppercase tracking-widest mt-4">{authLoading ? "..." : (authMode === 'login' ? 'Giriş Yap' : 'Kayıt Ol')}</button>
+            <input type="password" placeholder="SIFRE" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-blue-600" required/></div>
+          <button type="submit" disabled={authLoading} className="w-full bg-blue-600 font-black py-5 rounded-2xl uppercase tracking-widest mt-4">{authLoading ? "..." : (authMode === 'login' ? 'Giris Yap' : 'Kayit Ol')}</button>
         </form>
-        <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="mt-8 text-zinc-500 hover:text-white text-[10px] font-black uppercase">{authMode === 'login' ? 'Kayıt Ol' : 'Giriş Yap'}</button>
+        <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="mt-8 text-zinc-500 hover:text-white text-[10px] font-black uppercase">{authMode === 'login' ? 'Kayit Ol' : 'Giris Yap'}</button>
       </div>
     </div>
   );
@@ -679,29 +715,31 @@ const handleChangeList = async (newListId: string) => {
       style={backgroundSettings.type !== 'image' ? getBackgroundStyle() : { backgroundColor: '#050505' }}>
       <style>{glowCSS}</style>
 
-      {/* ── ARKA PLAN RESMİ — cover + fixed + center ──────────────────────── */}
-      {backgroundSettings.type === 'image' && backgroundSettings.imageUrl && (<>
-        <div className="fixed inset-0 z-0" style={{
-          backgroundImage: `url(${backgroundSettings.imageUrl})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'fixed',
-          backgroundRepeat: 'no-repeat',
-          filter: backgroundSettings.blur > 0 ? `blur(${backgroundSettings.blur}px)` : 'none',
-          transform: backgroundSettings.blur > 0 ? 'scale(1.08)' : 'none',
-        }}/>
-        <div className="fixed inset-0 z-0" style={{ backgroundColor: `rgba(0,0,0,${backgroundSettings.opacity / 100})` }}/>
-      </>)}
+      {/* ── ARKA PLAN RESMİ ──────────────────────────────────────────────────── */}
+      {backgroundSettings.type === 'image' && backgroundSettings.imageUrl && (
+        <>
+          <div className="fixed inset-0 z-0" style={{
+            backgroundImage: `url(${backgroundSettings.imageUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed',
+            backgroundRepeat: 'no-repeat',
+            filter: backgroundSettings.blur > 0 ? `blur(${backgroundSettings.blur}px)` : 'none',
+            transform: backgroundSettings.blur > 0 ? 'scale(1.08)' : 'none',
+          }}/>
+          <div className="fixed inset-0 z-0" style={{ backgroundColor: `rgba(0,0,0,${backgroundSettings.opacity / 100})` }}/>
+        </>
+      )}
 
       {!isSidebarOpen && (
         <button onClick={() => setIsSidebarOpen(true)} className="fixed top-6 left-6 z-[300] p-4 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-2xl text-blue-500 shadow-2xl"><Menu/></button>
       )}
 
-      {/* ── GLOBAL RANDOM DICE BUTTON (sağ-alt) ────────────────────────────── */}
+      {/* ── GLOBAL RANDOM DICE BUTTON ────────────────────────────────────────── */}
       <button
         onClick={pickGlobalRandom}
         className="fixed bottom-8 right-8 z-[400] w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-2xl border border-blue-400/30 hover:scale-105 active:scale-90 transition-all duration-150"
-        title="Rastgele Kart Seç"
+        title="Rastgele Kart Sec"
       >
         <Dices size={26} className="text-white drop-shadow"/>
       </button>
@@ -714,14 +752,39 @@ const handleChangeList = async (newListId: string) => {
             <button onClick={() => setIsSidebarOpen(false)} className="text-zinc-500"><ChevronLeft/></button>
           </div>
           <div className="space-y-3 mb-8">
-            <button onClick={() => { fetchAllData(); setShowActivityPanel(true); }} className="w-full flex items-center gap-3 p-3 bg-green-600/10 text-green-500 rounded-xl border border-green-600/20 font-black uppercase italic text-[10px]"><Activity size={18}/> Aktivite</button>
-            <button onClick={() => setShowChatPanel(true)} className="w-full flex items-center gap-3 p-3 bg-purple-600/10 text-purple-500 rounded-xl border border-purple-600/20 font-black uppercase italic text-[10px]"><MessageCircle size={18}/> Sohbet & Arkadaşlar</button>
-            <button onClick={() => setShowSettingsPanel(true)} className="w-full flex items-center gap-3 p-3 bg-cyan-600/10 text-cyan-500 rounded-xl border border-cyan-600/20 font-black uppercase italic text-[10px]"><Settings size={18}/> Ayarlar</button>
-            <button onClick={toggleAdminPower} className={`w-full flex items-center gap-3 p-3 rounded-xl border font-black uppercase italic text-[10px] ${isAdmin ? 'bg-orange-600/20 text-orange-500 border-orange-600/40' : 'bg-white/5 text-zinc-500 border-white/10'}`}><ShieldAlert size={18}/> Admin: {isAdmin ? 'AÇIK' : 'KAPALI'}</button>
+            {/* Aktivite Butonu */}
+            <button 
+              onClick={() => { fetchAllData(); setShowActivityPanel(true); }} 
+              className="w-full flex items-center gap-3 p-3 bg-green-600/10 text-green-500 rounded-xl border border-green-600/20 font-black uppercase italic text-[10px] hover:bg-green-600/20 transition-all"
+            >
+              <Activity size={18}/> Aktivite
+            </button>
+            {/* Sohbet Butonu */}
+            <button 
+              onClick={() => setShowChatPanel(true)} 
+              className="w-full flex items-center gap-3 p-3 bg-purple-600/10 text-purple-500 rounded-xl border border-purple-600/20 font-black uppercase italic text-[10px] hover:bg-purple-600/20 transition-all"
+            >
+              <MessageCircle size={18}/> Sohbet
+            </button>
+            {/* Arkadaslar Butonu */}
+            <button 
+              onClick={() => setShowFriendsPanel(true)} 
+              className="w-full flex items-center gap-3 p-3 bg-pink-600/10 text-pink-500 rounded-xl border border-pink-600/20 font-black uppercase italic text-[10px] hover:bg-pink-600/20 transition-all"
+            >
+              <Users size={18}/> Arkadaslar
+            </button>
+            {/* Ayarlar Butonu */}
+            <button 
+              onClick={() => setShowSettingsPanel(true)} 
+              className="w-full flex items-center gap-3 p-3 bg-cyan-600/10 text-cyan-500 rounded-xl border border-cyan-600/20 font-black uppercase italic text-[10px] hover:bg-cyan-600/20 transition-all"
+            >
+              <Settings size={18}/> Ayarlar
+            </button>
+            <button onClick={toggleAdminPower} className={`w-full flex items-center gap-3 p-3 rounded-xl border font-black uppercase italic text-[10px] ${isAdmin ? 'bg-orange-600/20 text-orange-500 border-orange-600/40' : 'bg-white/5 text-zinc-500 border-white/10'}`}><ShieldAlert size={18}/> Admin: {isAdmin ? 'ACIK' : 'KAPALI'}</button>
           </div>
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-              <span className="text-[10px] font-black uppercase italic text-zinc-400 flex items-center gap-2"><BarChart3 size={14}/> En Popüler</span>
+              <span className="text-[10px] font-black uppercase italic text-zinc-400 flex items-center gap-2"><BarChart3 size={14}/> En Populer</span>
               {isAdmin && <button onClick={() => setShowStatsDetail(true)} className="text-[8px] font-black bg-blue-600/20 text-blue-500 px-2 py-1 rounded-md">Detaylar</button>}
             </div>
             <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar-v">
@@ -748,7 +811,7 @@ const handleChangeList = async (newListId: string) => {
                 </div>
                 <p className="text-[10px] font-black uppercase italic truncate">{currentUserName}</p>
               </div>
-              <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-3 p-3 bg-red-600/10 text-red-500 rounded-xl font-black uppercase italic text-[10px]"><LogOut size={16}/> Çıkış</button>
+              <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-3 p-3 bg-red-600/10 text-red-500 rounded-xl font-black uppercase italic text-[10px]"><LogOut size={16}/> Cikis</button>
             </div>
           </div>
         </div>
@@ -764,115 +827,175 @@ const handleChangeList = async (newListId: string) => {
         className={`flex-1 overflow-x-auto custom-scrollbar flex items-start p-6 md:p-10 gap-6 md:gap-8 h-full transition-all duration-500 relative z-10 ${!isSidebarOpen ? 'md:pl-24' : ''} ${isDragging ? 'cursor-grabbing select-none' : 'cursor-default'}`}
       >
         {categories.map((list, listIdx) => {
-          const listfiles = getSortedListfiles(list.id);
+          const listFiles = getSortedListFiles(list.id);
           return (
             <div key={list.id} className="w-[260px] md:w-[340px] shrink-0 bg-zinc-900/70 backdrop-blur-md border border-white/5 rounded-[2.5rem] flex flex-col max-h-[85vh] relative shadow-2xl">
+              {/* Liste Başlığı */}
               <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
-                <div className="flex items-center gap-0.5">
-                  <button onClick={() => moveList(listIdx, 'left')} disabled={listIdx === 0}
-                    className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
-                    <ChevronLeft size={14}/>
-                  </button>
-                  <button onClick={() => moveList(listIdx, 'right')} disabled={listIdx === categories.length - 1}
-                    className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90">
-                    <ChevronRight size={14}/>
-                  </button>
-                </div>
-                <h2 className="font-black text-[10px] md:text-[12px] uppercase tracking-widest text-blue-500 italic flex-1 text-center px-1">{list.title}</h2>
-                <div className="flex items-center gap-0.5">
-                  {isAdmin && <>
-                    <button onClick={() => handleListRename(list.id, list.title)} className="p-1.5 text-blue-500/50 hover:text-blue-500 transition-all"><Edit3 size={14}/></button>
-                    <button onClick={() => deleteList(list.id)} className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
-                  </>}
+                {/* Sol Chevron */}
+                <button 
+                  onClick={() => moveCategory(list.id, 'left')} 
+                  disabled={listIdx === 0}
+                  className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90"
+                >
+                  <ChevronLeft size={14}/>
+                </button>
+                
+                {/* Başlık - Inline Edit */}
+                {editingCategoryId === list.id ? (
+                  <input
+                    type="text"
+                    value={editingCategoryTitle}
+                    onChange={(e) => setEditingCategoryTitle(e.target.value)}
+                    onBlur={saveCategoryEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveCategoryEdit();
+                      if (e.key === 'Escape') cancelCategoryEdit();
+                    }}
+                    autoFocus
+                    className="flex-1 mx-2 px-2 py-1 bg-black/40 border border-blue-600 rounded-lg text-center text-[10px] md:text-[12px] font-black uppercase tracking-widest text-blue-500 italic outline-none"
+                  />
+                ) : (
+                  <h2 
+                    onClick={() => startCategoryEdit(list)}
+                    className="font-black text-[10px] md:text-[12px] uppercase tracking-widest text-blue-500 italic flex-1 text-center px-1 cursor-pointer hover:text-blue-400 transition-colors"
+                    title="Tikla ve isim degistir"
+                  >
+                    {list.title}
+                  </h2>
+                )}
+                
+                {/* Sag Chevron */}
+                <button 
+                  onClick={() => moveCategory(list.id, 'right')} 
+                  disabled={listIdx === categories.length - 1}
+                  className="p-1.5 rounded-lg text-zinc-600 hover:text-blue-400 hover:bg-blue-600/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all active:scale-90"
+                >
+                  <ChevronRight size={14}/>
+                </button>
+                
+                {/* Admin Butonları */}
+                <div className="flex items-center gap-0.5 ml-2">
+                  {isAdmin && (
+                    <>
+                      <button onClick={() => handleListRename(list.id, list.title)} className="p-1.5 text-blue-500/50 hover:text-blue-500 transition-all"><Edit3 size={14}/></button>
+                      <button onClick={() => deleteList(list.id)} className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
+                    </>
+                  )}
                 </div>
               </div>
+
+              {/* Kartlar */}
               <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
-                {listfiles.map((files, idx) => (
+                {listFiles.map((file, idx) => (
                   <div
-                    id={`files-${files.id}`}
-                    key={files.id}
-                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
+                    id={`files-${file.id}`}
+                    key={file.id}
+                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === file.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
                   >
-                  {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
-
-{/* KART İÇERİĞİ SARMALAYICI BİTİŞİ (Eksik olan buydu) */}
-                </div> 
-
+                    {/* Edit Butonu */}
+                    <button 
+                      onClick={() => {
+                        setEditingFile(file);
+                        setEditTitle(file.title);
+                        setEditMegaUrl(file.mega_url);
+                        setEditFile(null);
+                        setEditListId(file.category);
+                        setShowEditModal(true);
+                      }} 
+                      className="absolute top-3 right-3 z-30 bg-blue-600/80 backdrop-blur-sm p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-600 hover:scale-110"
+                    >
+                      <Edit3 size={16}/>
+                    </button>
+                    
+                    {/* Kart Gorsel */}
+                    <button 
+                      onClick={() => handleFilesClick(file)} 
+                      className="w-full aspect-video bg-black/40 relative block overflow-hidden"
+                    >
+                      <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+                    </button>
+                    
+                    {/* Kart Alt Bilgi */}
+                    <div className="p-3 md:p-4 flex justify-between items-center">
+                      <span className="font-black text-[9px] md:text-xs uppercase italic text-zinc-200 truncate pr-2">{file.title}</span>
+                      <div className="flex items-center gap-1">
+                        {/* Kart Sıralama Butonları */}
+                        <button 
+                          onClick={() => moveFiles(idx, 'up', list.id)} 
+                          disabled={idx === 0}
+                          className="p-1 text-zinc-600 hover:text-blue-400 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                        >
+                          <ChevronUp size={12}/>
+                        </button>
+                        <button 
+                          onClick={() => moveFiles(idx, 'down', list.id)} 
+                          disabled={idx === listFiles.length - 1}
+                          className="p-1 text-zinc-600 hover:text-blue-400 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                        >
+                          <ChevronDown size={12}/>
+                        </button>
+                        {/* Liste Değiştir */}
+                        <button 
+                          onClick={() => { setChangeCatTarget(file); setShowChangeCatModal(true); }}
+                          className="p-1 text-purple-500/50 hover:text-purple-500 transition-all"
+                        >
+                          <ArrowLeftRight size={12}/>
+                        </button>
+                        {/* Silme */}
+                        {isAdmin && (
+                          <button onClick={() => deleteFiles(file.id)} className="p-1 text-red-500/50 hover:text-red-500 transition-all"><Trash2 size={12}/></button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Kart Ekle Butonu */}
                 <button 
                   onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} 
-                  className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase"
+                  className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 hover:border-blue-600/30 transition-all uppercase"
                 >
                   + Kart Ekle
                 </button>
               </div>
-            );
-          })}
-        </div>
-
-        {/* ── LİSTE DEĞİŞTİR MODAL ─────────────────────────────────────────── */}
-        {showChangeCatModal && changeCatTarget && (
-          <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
-            <div className="w-full max-w-sm bg-zinc-900 border border-purple-600/30 p-8 rounded-[3rem] shadow-4xl">
-              <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3">
-                <ArrowLeftRight size={22}/> Liste Değiştir
-              </h2>
-              <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">
-                "{changeCatTarget.title}" kartını taşı
-              </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
-                {categories.filter(l => l.id !== changeCatTarget.category).map(list => (
-                  <button 
-                    key={list.id} 
-                    onClick={() => handleChangeList(list.id)}
-                    className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all"
-                  >
-                    {list.title}
-                  </button>
-                ))}
-              </div>
-              <button 
-                onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }} 
-                className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase"
-              >
-                İptal
-              </button>
             </div>
-          </div>
-        )}
-
-{/* BURASI DÜZELDİ: Linkin açılması için window.open eklendi */}
-<button onClick={() => { if(files.mega_url) window.open(files.mega_url, "_blank"); }} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
-  <img src={files.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
-</button>
-
-<div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-  <span className="truncate pr-2">{files.title}</span>
-  {isAdmin && <button onClick={() => deletefiles(files.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
-</div>
-                <button onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
-              </div>
           );
         })}
       </div>
 
-      {/* ── LİSTE DEĞİŞTİR ──────────────────────────────────────────────────── */}
+      {/* ── LİSTE DEĞİŞTİR MODAL ────────────────────────────────────────────── */}
       {showChangeCatModal && changeCatTarget && (
         <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-sm bg-zinc-900 border border-purple-600/30 p-8 rounded-[3rem] shadow-4xl">
-            <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3"><ArrowLeftRight size={22}/> Liste Değiştir</h2>
-            <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">"{changeCatTarget.title}" kartını taşı</p>
+            <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3">
+              <ArrowLeftRight size={22}/> Liste Degistir
+            </h2>
+            <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">
+              &quot;{changeCatTarget.title}&quot; kartini tasi
+            </p>
             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
-              {categories.filter(l => l.id !== changeCatTarget.category).map(list => (
-                <button key={list.id} onClick={() => handleChangeList(list.id)}
-                  className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all">{list.title}</button>
+              {categories.filter(l => l.id !== changeCatTarget.category).map(catItem => (
+                <button 
+                  key={catItem.id} 
+                  onClick={() => handleChangeList(catItem.id)}
+                  className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all"
+                >
+                  {catItem.title}
+                </button>
               ))}
             </div>
-            <button onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }} className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase">İptal</button>
+            <button 
+              onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }} 
+              className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase"
+            >
+              Iptal
+            </button>
           </div>
         </div>
       )}
 
-{/* ── AKTİVİTE PANELİ (TEK VE TEMİZ BLOK) ─────────────────────────────────── */}
+      {/* ── AKTİVİTE PANELİ ──────────────────────────────────────────────────── */}
       {showActivityPanel && (
         <div className="fixed inset-0 z-[600] bg-[#050505] flex flex-col overflow-hidden">
           <div className="p-8 border-b border-white/5 flex flex-col gap-4 bg-zinc-900/50">
@@ -884,7 +1007,7 @@ const handleChangeList = async (newListId: string) => {
                   </button>
                 )}
                 <h2 className="text-3xl font-black uppercase italic">
-                  {searchedUserData ? `${searchedUserData.user} - Profil` : selectedUser ? `${selectedUser} - Aktiviteler` : 'Kullanıcı Listesi'}
+                  {searchedUserData ? `${searchedUserData.user} - Profil` : selectedUser ? `${selectedUser} - Aktiviteler` : 'Kullanici Listesi'}
                 </h2>
               </div>
               <button onClick={() => { setShowActivityPanel(false); setSelectedUser(null); setSearchedUserData(null); setUserSearchQuery(""); }} className="p-3 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-600 transition-all">
@@ -896,7 +1019,7 @@ const handleChangeList = async (newListId: string) => {
               <div className="flex gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18}/>
-                  <input type="text" value={userSearchQuery} onChange={e => setUserSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleUserSearch()} placeholder="Kullanıcı ara..." className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-green-600"/>
+                  <input type="text" value={userSearchQuery} onChange={e => setUserSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleUserSearch()} placeholder="Kullanici ara..." className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-2xl text-xs font-bold outline-none focus:border-green-600"/>
                 </div>
                 <button onClick={handleUserSearch} className="px-6 bg-green-600 rounded-2xl font-black text-[10px] uppercase hover:bg-green-500 transition-all">Ara</button>
               </div>
@@ -904,7 +1027,7 @@ const handleChangeList = async (newListId: string) => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-8 custom-scrollbar-v">
-            {/* ARAMA SONUCU: PROFIL GÖRÜNÜMÜ */}
+            {/* ARAMA SONUCU */}
             {searchedUserData && (
               <div className="max-w-4xl mx-auto space-y-8">
                 <div className="bg-zinc-900/60 border border-white/10 rounded-[2rem] p-8 flex items-center gap-6">
@@ -917,7 +1040,7 @@ const handleChangeList = async (newListId: string) => {
                   <div>
                     <h3 className="text-2xl font-black uppercase italic">{searchedUserData.user}</h3>
                     <p className={`text-sm font-bold ${isUserOnline(searchedUserData.user) ? 'text-green-400' : 'text-zinc-500'}`}>{getLastSeen(searchedUserData.user)}</p>
-                    <p className="text-xs text-zinc-600 mt-2">{searchedUserData.logs.length} aktivite | {searchedUserData.files?.length || 0} kart tıklamış</p>
+                    <p className="text-xs text-zinc-600 mt-2">{searchedUserData.logs.length} aktivite | {searchedUserData.files?.length || 0} kart tiklamis</p>
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -937,27 +1060,8 @@ const handleChangeList = async (newListId: string) => {
                 {getVisibleUsers().map(uName => (
                   <div key={uName} className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 aspect-[4/3] flex flex-col items-center justify-center transition-all hover:border-blue-600/50 shadow-2xl">
                     {userProfiles[uName] && <img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt=""/>}
-                    <User className="mb-4 text-blue-500 relative z-10" size={48}/>
-                    <button onClick={() => setSelectedUser(uName)} className="relative z-10 font-black uppercase italic text-lg tracking-wider hover:text-blue-400">{uName}</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div> 
-        </div>
-      )}
-      </div> // Ana kapsayıcı div
-  );
-}
-
-            {/* ANA LİSTE: KULLANICI KARTLARI */}
-            {!selectedUser && !searchedUserData && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {getVisibleUsers().map(uName => (
-                  <div key={uName} className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 aspect-[4/3] flex flex-col items-center justify-center transition-all hover:border-blue-600/50 shadow-2xl">
-                    {userProfiles[uName] && <img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt=""/>}
                     <label className="absolute top-4 right-4 p-2 bg-black/60 rounded-xl text-blue-500 opacity-0 group-hover:opacity-100 cursor-pointer z-20"><ImageIcon size={16}/><input type="file" accept="image/*" className="hidden" onChange={e => handleUserPhotoUpload(uName, e)}/></label>
-                    <div className={`absolute top-4 left-4 px-2 py-1 rounded-full text-[8px] font-black uppercase ${isUserOnline(uName) ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400'}`}>{isUserOnline(uName) ? 'Çevrimiçi' : 'Çevrimdışı'}</div>
+                    <div className={`absolute top-4 left-4 px-2 py-1 rounded-full text-[8px] font-black uppercase ${isUserOnline(uName) ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400'}`}>{isUserOnline(uName) ? 'Cevrimici' : 'Cevrimdisi'}</div>
                     <User className="mb-4 text-blue-500 relative z-10" size={48}/>
                     <button onClick={() => setSelectedUser(uName)} className="relative z-10 font-black uppercase italic text-lg tracking-wider hover:text-blue-400">{uName}</button>
                   </div>
@@ -980,13 +1084,13 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-      {/* ── SOHBET ──────────────────────────────────────────────────────────── */}
+      {/* ── SOHBET PANELİ ───────────────────────────────────────────────────── */}
       {showChatPanel && (
         <div className="fixed inset-0 z-[700] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-6xl h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-row shadow-4xl relative">
             <div className="w-80 border-r border-white/5 flex flex-col bg-zinc-900/30">
               <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                <h3 className="font-black uppercase italic text-sm text-blue-500">Arkadaşlar</h3>
+                <h3 className="font-black uppercase italic text-sm text-blue-500">Arkadaslar</h3>
                 <button onClick={() => setShowAddFriendModal(true)} className="p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 transition-all"><UserPlus size={18}/></button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -1052,24 +1156,24 @@ const handleChangeList = async (newListId: string) => {
                     <div ref={chatEndRef}/>
                   </div>
                   <form onSubmit={handleSendMessage} className="p-6 border-t border-white/5 flex gap-4 bg-zinc-900/30">
-                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={`${activeChatFriend} kişisine mesaj yaz...`} className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:border-blue-600"/>
+                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={`${activeChatFriend} kisisine mesaj yaz...`} className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl text-xs outline-none focus:border-blue-600"/>
                     <button type="submit" className="p-4 bg-blue-600 rounded-2xl hover:bg-blue-500 transition-all"><Send size={18}/></button>
                   </form>
                 </>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 uppercase italic font-black">
-                  <MessageCircle size={64} className="mb-4 opacity-20"/><p>Mesajlaşmak için bir arkadaş seç</p>
+                  <MessageCircle size={64} className="mb-4 opacity-20"/><p>Mesajlasmak icin bir arkadas sec</p>
                 </div>
               )}
             </div>
             {showAddFriendModal && (
               <div className="absolute inset-0 z-[800] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
                 <div className="w-full max-w-sm bg-zinc-900 border border-white/10 p-8 rounded-[2rem] text-center">
-                  <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadaş Ara</h3>
-                  <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTİF KULLANICILAR EKLENEBİLİR</p>
-                  <input type="text" value={searchFriendName} onChange={e => setSearchFriendName(e.target.value)} placeholder="Tam kullanıcı adı..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6"/>
+                  <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadas Ara</h3>
+                  <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTIF KULLANICILAR EKLENEBILIR</p>
+                  <input type="text" value={searchFriendName} onChange={e => setSearchFriendName(e.target.value)} placeholder="Tam kullanici adi..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6"/>
                   <div className="flex gap-4">
-                    <button onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
+                    <button onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">Iptal</button>
                     <button onClick={handleAddFriend} className="flex-1 p-3 bg-blue-600 rounded-xl text-[10px] font-black uppercase">Ekle</button>
                   </div>
                 </div>
@@ -1079,12 +1183,53 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
+      {/* ── ARKADASLAR PANELİ ────────────────────────────────────────────────── */}
+      {showFriendsPanel && (
+        <div className="fixed inset-0 z-[700] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-pink-600/10 to-transparent">
+              <h2 className="text-2xl font-black uppercase italic text-pink-500 flex items-center gap-3"><Users size={28}/> Arkadaslar</h2>
+              <button onClick={() => setShowFriendsPanel(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-3">
+              {friends.length === 0 ? (
+                <div className="text-center py-12 text-zinc-600">
+                  <Users size={48} className="mx-auto mb-4 opacity-30"/>
+                  <p className="font-black uppercase italic">Henuz arkadas yok</p>
+                </div>
+              ) : (
+                friends.map((fName, i) => (
+                  <div key={i} className="p-4 bg-zinc-900/60 border border-white/5 rounded-2xl flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center font-black italic overflow-hidden">
+                        {userProfiles[fName] ? <img src={userProfiles[fName]} className="w-full h-full object-cover" alt=""/> : fName[0].toUpperCase()}
+                      </div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${isUserOnline(fName) ? 'bg-green-500' : 'bg-zinc-500'}`}/>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-black uppercase italic">{fName}</p>
+                      <p className={`text-[9px] font-bold ${isUserOnline(fName) ? 'text-green-400' : 'text-zinc-500'}`}>{getLastSeen(fName)}</p>
+                    </div>
+                    <button 
+                      onClick={() => { setShowFriendsPanel(false); setActiveChatFriend(fName); setShowChatPanel(true); }}
+                      className="p-3 bg-blue-600/20 text-blue-500 rounded-xl hover:bg-blue-600 transition-all"
+                    >
+                      <MessageCircle size={18}/>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── STATS ───────────────────────────────────────────────────────────── */}
       {showStatsDetail && isAdmin && (
         <div className="fixed inset-0 z-[900] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-4xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col h-[85vh]">
             <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-blue-600/10 to-transparent">
-              <h2 className="text-2xl font-black uppercase italic text-blue-500">Analiz & Tıklama Geçmişi</h2>
+              <h2 className="text-2xl font-black uppercase italic text-blue-500">Analiz & Tiklama Gecmisi</h2>
               <button onClick={() => setShowStatsDetail(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar-v">
@@ -1116,39 +1261,39 @@ const handleChangeList = async (newListId: string) => {
       )}
 
       {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
-      {showEditModal && editingfiles && (
+      {showEditModal && editingFile && (
         <div className="fixed inset-0 z-[1100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-lg bg-zinc-900 border border-blue-600/30 p-8 rounded-[3rem] shadow-4xl">
-            <h2 className="text-2xl font-black italic uppercase mb-6 text-blue-500 flex items-center gap-3"><Edit3/> Düzenle</h2>
+            <h2 className="text-2xl font-black italic uppercase mb-6 text-blue-500 flex items-center gap-3"><Edit3/> Duzenle</h2>
             <form onSubmit={handleUpdate} className="space-y-4">
-              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600" placeholder="BAŞLIK"/>
+              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600" placeholder="BASLIK"/>
               <input type="text" value={editMegaUrl} onChange={e => setEditMegaUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600" placeholder="MEGA URL"/>
               <div>
                 <label className="text-[9px] font-bold text-zinc-500 uppercase mb-1 block">Liste</label>
                 <select value={editListId} onChange={e => setEditListId(e.target.value)} className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600">
-                  {categories.map(list => <option key={list.id} value={list.id}>{list.title}</option>)}
+                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.title}</option>)}
                 </select>
               </div>
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <img src={editFile ? URL.createObjectURL(editFile) : editingfiles.image_url} className="w-20 h-20 object-contain rounded-xl border border-white/10" alt=""/>
+                  <img src={editFile ? URL.createObjectURL(editFile) : editingFile.image_url} className="w-20 h-20 object-contain rounded-xl border border-white/10" alt=""/>
                   <div className="flex-1">
-                    <p className="text-[9px] font-bold text-zinc-500 uppercase mb-1">Görsel Değiştir</p>
-                    <p className="text-[9px] font-bold text-blue-400 mb-2">💡 Ctrl+V ile yapıştır</p>
+                    <p className="text-[9px] font-bold text-zinc-500 uppercase mb-1">Gorsel Degistir</p>
+                    <p className="text-[9px] font-bold text-blue-400 mb-2">Ctrl+V ile yapistir</p>
                     <input type="file" accept="image/*" onChange={e => setEditFile(e.target.files?.[0] || null)} className="w-full text-xs text-zinc-400"/>
                   </div>
                 </div>
                 {editFile && (
                   <div className="flex items-center gap-2 p-2 bg-green-600/10 border border-green-600/20 rounded-xl">
                     <div className="w-2 h-2 bg-green-500 rounded-full"/>
-                    <p className="text-[9px] font-bold text-green-400">{editFile.name} seçildi</p>
+                    <p className="text-[9px] font-bold text-green-400">{editFile.name} secildi</p>
                     <button type="button" onClick={() => setEditFile(null)} className="ml-auto text-zinc-500 hover:text-red-400"><X size={12}/></button>
                   </div>
                 )}
               </div>
               <div className="flex gap-4 mt-6">
-                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">İPTAL</button>
-                <button type="submit" disabled={loading} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">{loading ? "..." : "GÜNCELLE"}</button>
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">IPTAL</button>
+                <button type="submit" disabled={loading} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">{loading ? "..." : "GUNCELLE"}</button>
               </div>
             </form>
           </div>
@@ -1161,10 +1306,10 @@ const handleChangeList = async (newListId: string) => {
           <div className="w-full max-w-lg bg-zinc-900 border border-white/10 p-8 rounded-[3rem]">
             <h2 className="text-2xl font-black italic uppercase mb-6 text-blue-500">Yeni Kart Ekle</h2>
             <form onSubmit={handleUpload} className="space-y-4">
-              <input type="text" placeholder="BAŞLIK" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600"/>
+              <input type="text" placeholder="BASLIK" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600"/>
               <input type="text" placeholder="MEGA URL" value={megaUrl} onChange={e => setMegaUrl(e.target.value)} className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none text-xs focus:border-blue-600"/>
               <div>
-                <p className="text-[9px] font-bold text-blue-400 mb-2">💡 Ctrl+V ile panodan görsel yapıştır</p>
+                <p className="text-[9px] font-bold text-blue-400 mb-2">Ctrl+V ile panodan gorsel yapistir</p>
                 <input type="file" accept="image/*" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="w-full text-xs text-zinc-400"/>
                 {selectedFile && (
                   <div className="mt-2 flex items-center gap-3 p-2 bg-green-600/10 border border-green-600/20 rounded-xl">
@@ -1175,7 +1320,7 @@ const handleChangeList = async (newListId: string) => {
                 )}
               </div>
               <div className="flex gap-4 mt-6">
-                <button type="button" onClick={() => { setShowAddModal(false); setSelectedFile(null); }} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">İPTAL</button>
+                <button type="button" onClick={() => { setShowAddModal(false); setSelectedFile(null); }} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">IPTAL</button>
                 <button type="submit" disabled={loading} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase">{loading ? "..." : "KAYDET"}</button>
               </div>
             </form>
@@ -1194,7 +1339,7 @@ const handleChangeList = async (newListId: string) => {
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar-v">
               {/* Profil */}
               <div>
-                <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><User size={16}/> Profil Düzenle</h3>
+                <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><User size={16}/> Profil Duzenle</h3>
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
                   <div className="flex items-center gap-4 mb-2">
                     <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center overflow-hidden font-black text-2xl">
@@ -1214,32 +1359,32 @@ const handleChangeList = async (newListId: string) => {
                         </div>
                       )}
                       <div className="flex gap-3">
-                        <button onClick={() => { setShowProfileEdit(false); setNewDisplayName(""); setNewProfileFile(null); }} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
+                        <button onClick={() => { setShowProfileEdit(false); setNewDisplayName(""); setNewProfileFile(null); }} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">Iptal</button>
                         <button onClick={handleProfileUpdate} disabled={profileLoading} className="flex-1 p-3 bg-cyan-600 rounded-xl text-[10px] font-black uppercase disabled:opacity-50">{profileLoading ? "..." : "Kaydet"}</button>
                       </div>
                     </div>
                   ) : (
                     <button onClick={() => setShowProfileEdit(true)} className="w-full p-3 bg-cyan-600/10 text-cyan-500 rounded-xl font-black uppercase text-[10px] border border-cyan-600/20 hover:bg-cyan-600/20 transition-all flex items-center justify-center gap-2">
-                      <Camera size={14}/> Profili Düzenle
+                      <Camera size={14}/> Profili Duzenle
                     </button>
                   )}
                 </div>
               </div>
               {/* Arka Plan */}
               <div>
-                <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><Palette size={16}/> Arka Plan Türü</h3>
+                <h3 className="text-sm font-black uppercase italic text-zinc-300 mb-4 flex items-center gap-2"><Palette size={16}/> Arka Plan Turu</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {(['solid', 'gradient', 'image'] as const).map(type => (
                     <button key={type} onClick={() => saveBg({ ...backgroundSettings, type })}
                       className={`p-4 rounded-2xl border font-black uppercase text-[10px] transition-all ${backgroundSettings.type === type ? 'bg-cyan-600 border-cyan-400 text-white' : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'}`}>
-                      {type === 'solid' ? 'Düz Renk' : type === 'gradient' ? 'Gradient' : 'Resim/GIF'}
+                      {type === 'solid' ? 'Duz Renk' : type === 'gradient' ? 'Gradient' : 'Resim/GIF'}
                     </button>
                   ))}
                 </div>
               </div>
               {backgroundSettings.type === 'solid' && (
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
-                  <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><Paintbrush size={14}/> Düz Renk</h4>
+                  <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><Paintbrush size={14}/> Duz Renk</h4>
                   <div className="flex items-center gap-4">
                     <input type="color" value={backgroundSettings.solidColor} onChange={e => saveBg({ ...backgroundSettings, solidColor: e.target.value })} className="w-16 h-16 rounded-2xl border-2 border-white/10 cursor-pointer bg-transparent"/>
                     <input type="text" value={backgroundSettings.solidColor} onChange={e => saveBg({ ...backgroundSettings, solidColor: e.target.value })} className="flex-1 bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 uppercase"/>
@@ -1255,7 +1400,7 @@ const handleChangeList = async (newListId: string) => {
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
                   <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><Paintbrush size={14}/> Gradient</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    {[{ label: 'Başlangıç', key: 'gradientStart' as const }, { label: 'Bitiş', key: 'gradientEnd' as const }].map(({ label, key }) => (
+                    {[{ label: 'Baslangic', key: 'gradientStart' as const }, { label: 'Bitis', key: 'gradientEnd' as const }].map(({ label, key }) => (
                       <div key={key}>
                         <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 block">{label}</label>
                         <div className="flex items-center gap-2">
@@ -1266,28 +1411,28 @@ const handleChangeList = async (newListId: string) => {
                     ))}
                   </div>
                   <select value={backgroundSettings.gradientDirection} onChange={e => saveBg({ ...backgroundSettings, gradientDirection: e.target.value })} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 text-white">
-                    <option value="to bottom">Yukarıdan Aşağı</option>
-                    <option value="to top">Aşağıdan Yukarı</option>
-                    <option value="to right">Soldan Sağa</option>
-                    <option value="to left">Sağdan Sola</option>
-                    <option value="to bottom right">Köşegen (Sağ Alt)</option>
-                    <option value="to bottom left">Köşegen (Sol Alt)</option>
+                    <option value="to bottom">Yukaridan Asagi</option>
+                    <option value="to top">Asagidan Yukari</option>
+                    <option value="to right">Soldan Saga</option>
+                    <option value="to left">Sagdan Sola</option>
+                    <option value="to bottom right">Kosegen (Sag Alt)</option>
+                    <option value="to bottom left">Kosegen (Sol Alt)</option>
                   </select>
                   <div className="h-20 rounded-xl border border-white/10" style={{ background: `linear-gradient(${backgroundSettings.gradientDirection},${backgroundSettings.gradientStart},${backgroundSettings.gradientEnd})` }}/>
                 </div>
               )}
               {backgroundSettings.type === 'image' && (
                 <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 space-y-4">
-                  <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><ImageIcon size={14}/> Resim / GIF Yükle</h4>
+                  <h4 className="text-xs font-black uppercase italic text-zinc-400 flex items-center gap-2"><ImageIcon size={14}/> Resim / GIF Yukle</h4>
                   <input ref={bgFileInputRef} type="file" accept="image/*,image/gif,.gif" className="hidden" onChange={handleBgFileUpload}/>
                   <button onClick={() => bgFileInputRef.current?.click()} disabled={bgUploading}
                     className="w-full p-6 bg-white/[0.02] border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center gap-3 hover:bg-cyan-600/5 hover:border-cyan-600/30 transition-all disabled:opacity-50">
                     {bgUploading ? <RefreshCw size={32} className="text-cyan-500 animate-spin"/> : <Upload size={32} className="text-cyan-500"/>}
-                    <p className="text-xs font-black uppercase text-zinc-400">{bgUploading ? "Yükleniyor..." : "Dosya Seç"}</p>
-                    <p className="text-[9px] text-zinc-600">PNG, JPG, GIF, WEBP • cover + fixed + center</p>
+                    <p className="text-xs font-black uppercase text-zinc-400">{bgUploading ? "Yukleniyor..." : "Dosya Sec"}</p>
+                    <p className="text-[9px] text-zinc-600">PNG, JPG, GIF, WEBP</p>
                   </button>
                   <div>
-                    <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span className="flex items-center gap-1"><Eye size={12}/> Bulanıklık</span><span className="text-cyan-500">{backgroundSettings.blur}px</span></label>
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span className="flex items-center gap-1"><Eye size={12}/> Bulaniklik</span><span className="text-cyan-500">{backgroundSettings.blur}px</span></label>
                     <input type="range" min="0" max="30" value={backgroundSettings.blur} onChange={e => saveBg({ ...backgroundSettings, blur: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
                   </div>
                   <div>
@@ -1298,20 +1443,20 @@ const handleChangeList = async (newListId: string) => {
                     <div className="relative h-32 rounded-xl border border-white/10 overflow-hidden">
                       <div className="absolute inset-0" style={{ backgroundImage: `url(${backgroundSettings.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: backgroundSettings.blur > 0 ? `blur(${backgroundSettings.blur}px)` : 'none' }}/>
                       <div className="absolute inset-0" style={{ backgroundColor: `rgba(0,0,0,${backgroundSettings.opacity / 100})` }}/>
-                      <p className="absolute inset-0 flex items-center justify-center text-xs font-black uppercase text-white/80 z-10">Önizleme</p>
+                      <p className="absolute inset-0 flex items-center justify-center text-xs font-black uppercase text-white/80 z-10">Onizleme</p>
                     </div>
                   )}
                 </div>
               )}
               <button onClick={() => saveBg({ type: 'solid', solidColor: '#050505', gradientStart: '#050505', gradientEnd: '#1a1a2e', gradientDirection: 'to bottom right', imageUrl: '', blur: 0, opacity: 50 })}
                 className="w-full p-4 bg-red-600/10 text-red-500 rounded-2xl font-black uppercase text-[10px] border border-red-600/20 hover:bg-red-600/20 transition-all">
-                Varsayılana Sıfırla
+                Varsayilana Sifirla
               </button>
               {isAdmin && (
                 <div className="border-t border-white/5 pt-6">
                   <h3 className="text-sm font-black uppercase italic text-orange-400 mb-4 flex items-center gap-2"><ShieldAlert size={16}/> Admin Paneli</h3>
                   <button onClick={() => { setShowSettingsPanel(false); setShowSystemLogs(true); }} className="w-full p-4 bg-orange-600/10 text-orange-500 rounded-2xl font-black uppercase text-[10px] border border-orange-600/20 hover:bg-orange-600/20 transition-all flex items-center justify-center gap-2">
-                    <Activity size={16}/> Sistem Loglarını Gör
+                    <Activity size={16}/> Sistem Loglarini Gor
                   </button>
                 </div>
               )}
@@ -1324,7 +1469,7 @@ const handleChangeList = async (newListId: string) => {
       {showSystemLogs && isAdmin && (
         <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
           <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-orange-600/10 to-transparent">
-            <h2 className="text-2xl font-black uppercase italic text-orange-500 flex items-center gap-3"><ShieldAlert size={28}/> Sistem Logları</h2>
+            <h2 className="text-2xl font-black uppercase italic text-orange-500 flex items-center gap-3"><ShieldAlert size={28}/> Sistem Loglari</h2>
             <button onClick={() => setShowSystemLogs(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
           </div>
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar-v">
@@ -1332,7 +1477,7 @@ const handleChangeList = async (newListId: string) => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 {[
                   { val: logs.length, label: 'Toplam Log', color: 'text-blue-500' },
-                  { val: getVisibleUsers().length, label: 'Kullanıcı', color: 'text-green-500' },
+                  { val: getVisibleUsers().length, label: 'Kullanici', color: 'text-green-500' },
                   { val: files.length, label: 'Kart', color: 'text-purple-500' },
                   { val: categories.length, label: 'Liste', color: 'text-orange-500' }
                 ].map(({ val, label, color }) => (
@@ -1343,7 +1488,7 @@ const handleChangeList = async (newListId: string) => {
                 ))}
               </div>
               <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] overflow-hidden">
-                <div className="p-6 border-b border-white/5"><h3 className="font-black uppercase italic text-sm">Tüm Tıklama Geçmişi</h3></div>
+                <div className="p-6 border-b border-white/5"><h3 className="font-black uppercase italic text-sm">Tum Tiklama Gecmisi</h3></div>
                 <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto custom-scrollbar-v">
                   {logs.map(log => (
                     <div key={log.id} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-all">
@@ -1353,7 +1498,7 @@ const handleChangeList = async (newListId: string) => {
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-[9px] font-bold text-blue-400 bg-blue-600/20 px-2 py-0.5 rounded-full">{log.user_name || 'Anonim'}</span>
                           <span className="text-[9px] font-bold text-zinc-500">{new Date(log.created_at).toLocaleString('tr-TR')}</span>
-                          {log.files_id && <span className="text-[9px] font-bold text-zinc-600">ID:{log.files_id}</span>}
+                          {log.file_id && <span className="text-[9px] font-bold text-zinc-600">ID:{log.file_id}</span>}
                         </div>
                       </div>
                     </div>
@@ -1365,7 +1510,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-      {/* ŞANSLI KART MODAL */}
+      {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
       {randomFiles && (
         <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
@@ -1374,7 +1519,7 @@ const handleChangeList = async (newListId: string) => {
               <h2 className="text-3xl font-black italic uppercase mb-8">{randomFiles.title}</h2>
               <div className="flex gap-4 px-6">
                 <button onClick={() => setRandomFiles(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
-                <button onClick={() => handlefilesClick(randomFiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
+                <button onClick={() => handleFilesClick(randomFiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GIT</button>
               </div>
             </div>
           </div>
