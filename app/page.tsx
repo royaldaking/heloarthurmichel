@@ -14,29 +14,37 @@ const supabaseKey = "sb_publishable_JgD3W7_LA5OLvE_j2GzgSw_4vBaKN7N";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
-interface List     { id: string; title: string; order: number; }
-interface Card     { id: number; title: string; mega_url: string; image_url: string; list_id: string; order: number; }
-interface LogEntry { id: number; created_at: string; title: string; image_url: string; user_name?: string; card_id?: number | null; }
-interface Message  { id?: number; created_at?: string; sender_name: string; receiver_name: string; text: string; }
-interface BackgroundSettings {
-  type: 'solid' | 'gradient' | 'image';
-  solidColor: string;
-  gradientStart: string;
-  gradientEnd: string;
-  gradientDirection: string;
-  imageUrl: string;
-  blur: number;
-  opacity: number;
+interface Category { 
+  id: string; 
+  title: string; 
+  order_index: number; // order -> order_index oldu
 }
 
-export default function EmreBoard() {
-  const [session, setSession] = useState<any>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [avatarUrl, setAvatarUrl] = useState("");
+interface ArchiveItem { 
+  id: number; 
+  title: string; 
+  mega_url: string; 
+  image_url: string; 
+  list_id: string; 
+  order_index: number; // order -> order_index oldu
+}
+
+interface LogEntry { 
+  id: number; 
+  created_at: string; 
+  title: string; 
+  image_url: string; 
+  user_name?: string; 
+  card_id?: number | null; 
+}
+
+interface Message { 
+  id?: number; 
+  created_at?: string; 
+  sender_name: string; 
+  receiver_name: string; 
+  text: string; 
+}
 
   // ── Ana veri ──────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<List[]>([]);
@@ -211,10 +219,15 @@ export default function EmreBoard() {
 
   // ── VERİ ÇEKME ────────────────────────────────────────────────────────────
   async function fetchAllData() {
-    const { data: catData } = await supabase.from("kategoriler").select("*").order("id", { ascending: true });
+    // Kategorileri id'ye göre veya varsa kendi order_index'ine göre çekebilirsin
+    const { data: catData } = await supabase.from("kategoriler").select("*").order("order_index", { ascending: true });
     if (catData) setCategories(catData as Category[]);
+
+    // Arşivi senin eklediğin order_index sütununa göre çekiyoruz
     const { data: fileData } = await supabase.from("arsiv").select("*").order("order_index", { ascending: true });
     if (fileData) setFiles(fileData as ArchiveItem[]);
+
+    // Loglar her zaman en yeni en üstte olacak şekilde kalsın (id veya created_at)
     const { data: logData } = await supabase.from("logs").select("*").order("id", { ascending: false });
     if (logData) setLogs(logData as LogEntry[]);
   }
@@ -226,37 +239,37 @@ export default function EmreBoard() {
     const cur = lists[index];
     const tar = lists[tIdx];
     const updated = lists.map((l, i) => {
-      if (i === index) return { ...l, order: tar.order };
-      if (i === tIdx)  return { ...l, order: cur.order };
+      if (i === index) return { ...l, order_index: tar.order_index };
+      if (i === tIdx)  return { ...l, order_index: cur.order_index };
       return l;
     });
-    setLists([...updated].sort((a, b) => a.order - b.order));
-    await supabase.from("lists").update({ order: tar.order }).eq("id", cur.id);
-    await supabase.from("lists").update({ order: cur.order }).eq("id", tar.id);
+    setLists([...updated].sort((a, b) => a.order_index - b.order_index));
+   await supabase.from("kategoriler").update({ order_index: tar.order_index }).eq("id", cur.id);
+   await supabase.from("kategoriler").update({ order_index: cur.order_index }).eq("id", tar.id);
   };
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
   const moveCard = async (index: number, direction: 'up' | 'down', listId: string) => {
-    const listCards = [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order - b.order);
+    const listCards = [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
     const tIdx = direction === 'up' ? index - 1 : index + 1;
     if (tIdx < 0 || tIdx >= listCards.length) return;
     const cur = listCards[index];
     const tar = listCards[tIdx];
     setCards(prev => prev.map(c => {
-      if (c.id === cur.id) return { ...c, order: tar.order };
-      if (c.id === tar.id) return { ...c, order: cur.order };
+      if (c.id === cur.id) return { ...c, order_index: tar.order_index };
+      if (c.id === tar.id) return { ...c, order_index: cur.order_index };
       return c;
     }));
-    await supabase.from("cards").update({ order: tar.order }).eq("id", cur.id);
-    await supabase.from("cards").update({ order: cur.order }).eq("id", tar.id);
+    await supabase.from("arsiv").update({ order_index: tar.order_index }).eq("id", cur.id);
+    await supabase.from("arsiv").update({ order_index: cur.order_index }).eq("id", tar.id);
   };
 
   // ── KART LİSTE DEĞİŞTİRME ────────────────────────────────────────────────
   const handleChangeList = async (newListId: string) => {
     if (!changeCatTarget) return;
     const listCards = cards.filter(c => c.list_id === newListId);
-    const maxIdx = listCards.length > 0 ? Math.max(...listCards.map(c => c.order)) : 0;
-    await supabase.from("cards").update({ list_id: newListId, order: maxIdx + 1 }).eq("id", changeCatTarget.id);
+    const maxIdx = listCards.length > 0 ? Math.max(...listCards.map(c => c.order_index)) : 0;
+    await supabase.from("arsiv").update({ list_id: newListId, order_index: maxIdx + 1 }).eq("id", changeCatTarget.id);
     setShowChangeCatModal(false);
     setChangeCatTarget(null);
     fetchAllData();
@@ -454,17 +467,17 @@ export default function EmreBoard() {
         const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
         img = ud.publicUrl;
       }
-      let oi = editingCard.order;
+      let oi = editingCard.order_index;
       if (editListId !== editingCard.list_id) {
         const lc = cards.filter(c => c.list_id === editListId);
-        oi = lc.length > 0 ? Math.max(...lc.map(c => c.order)) + 1 : 0;
+        oi = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) + 1 : 0;
       }
-      await supabase.from("cards").update({
+      await supabase.from("arsiv").update({
         title: editTitle.toUpperCase(),
         mega_url: editMegaUrl,
         image_url: img,
         list_id: editListId,
-        order: oi
+        order_index: oi
       }).eq("id", editingCard.id);
       setShowEditModal(false);
       fetchAllData();
@@ -473,15 +486,15 @@ export default function EmreBoard() {
 
   const handleListRename = async (id: string, oldTitle: string) => {
     const n = prompt("Yeni isim:", oldTitle);
-    if (n) { await supabase.from("lists").update({ title: n }).eq("id", id); fetchAllData(); }
+    if (n) { await supabase.from("kategoriler").update({ title: n }).eq("id", id); fetchAllData(); }
   };
 
   const deleteList = async (id: string) => {
-    if (confirm("Silinsin mi?")) { await supabase.from("lists").delete().eq("id", id); fetchAllData(); }
+    if (confirm("Silinsin mi?")) { await supabase.from("kategoriler").delete().eq("id", id); fetchAllData(); }
   };
 
   const deleteCard = async (id: number) => {
-    if (confirm("Kart silinsin mi?")) { await supabase.from("cards").delete().eq("id", id); fetchAllData(); }
+    if (confirm("Kart silinsin mi?")) { await supabase.from("arsiv").delete().eq("id", id); fetchAllData(); }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -515,8 +528,8 @@ export default function EmreBoard() {
   const handleAddList = async () => {
     const name = prompt("Liste adı:");
     if (name) {
-      const maxIdx = lists.length > 0 ? Math.max(...lists.map(l => l.order || 0)) : 0;
-      await supabase.from("lists").insert([{ id: `list-${Date.now()}`, title: name.trim(), order: maxIdx + 1 }]);
+      const maxIdx = lists.length > 0 ? Math.max(...lists.map(l => l.order_index || 0)) : 0;
+      await supabase.from("kategoriler").insert([{ id: `list-${Date.now()}`, title: name.trim(), order_index: maxIdx + 1 }]);
       fetchAllData();
     }
   };
@@ -531,13 +544,13 @@ export default function EmreBoard() {
       await supabase.storage.from("arsiv-dosyalari").upload(fn, selectedFile);
       const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
       const lc = cards.filter(c => c.list_id === targetListId);
-      const maxIdx = lc.length > 0 ? Math.max(...lc.map(c => c.order)) : 0;
-      await supabase.from("cards").insert([{
+      const maxIdx = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) : 0;
+      await supabase.from("arsiv").insert([{
         title: title.toUpperCase(),
         mega_url: megaUrl,
         image_url: ud.publicUrl,
         list_id: targetListId,
-        order: maxIdx + 1
+        order_index: maxIdx + 1
       }]);
       setShowAddModal(false); setTitle(""); setMegaUrl(""); setSelectedFile(null);
       fetchAllData();
@@ -568,7 +581,7 @@ export default function EmreBoard() {
   };
 
   const getSortedListCards = (listId: string) =>
-    [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order - b.order);
+    [...cards.filter(c => c.list_id === listId)].sort((a, b) => a.order_index - b.order_index);
 
   const saveBg = (s: BackgroundSettings) => {
     setBackgroundSettings(s);
