@@ -796,7 +796,7 @@ const handleChangeList = async (newListId: string) => {
                   {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
 
 {/* KART İÇERİĞİ SARMALAYICI BİTİŞİ */}
-             </div>
+                </div>
 
                 <button
                   type="button"
