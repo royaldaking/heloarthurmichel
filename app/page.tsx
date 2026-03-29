@@ -796,16 +796,18 @@ const handleChangeList = async (newListId: string) => {
                   {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
 
 {/* KART İÇERİĞİ SARMALAYICI BİTİŞİ */}
-                </div>
+             </div>
 
                 <button
                   type="button"
-                  onClick={() => { setTargetListId(list.id); setShowAddModal(true); }}
+                  onClick={() => {
+                    setTargetListId(list.id);
+                    setShowAddModal(true);
+                  }}
                   className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase"
                 >
                   + Kart Ekle
                 </button>
-
         {/* ── LİSTE DEĞİŞTİR MODAL ─────────────────────────────────────────── */}
         {showChangeCatModal && changeCatTarget && (
           <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
