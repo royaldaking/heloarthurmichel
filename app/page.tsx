@@ -1365,7 +1365,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-   {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
+  {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
       {randomFiles && (
         <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
@@ -1382,6 +1382,6 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-    </div> // En dıştaki ana kapsayıcı div (genelde return'den hemen sonra açılan)
+    </div> 
   );
 }
