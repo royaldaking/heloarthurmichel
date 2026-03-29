@@ -841,30 +841,35 @@ const handleChangeList = async (newListId: string) => {
       )}
       
 {/* KART İÇERİĞİ: Resim ve Link */}
-                  <button 
-                    onClick={() => { if(file.mega_url) window.open(file.mega_url, "_blank"); }} 
-                    className="w-full aspect-video bg-black/40 relative block overflow-hidden"
-                  >
-                    <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
-                  </button>
+{files
+  .filter((f) => f.list_id === list.id)
+  .map((file) => (
+    <div key={file.id} className="group bg-zinc-900/40 border border-white/5 rounded-[2rem] overflow-hidden hover:border-blue-500/30 transition-all">
+      <button 
+        onClick={() => { if(file.mega_url) window.open(file.mega_url, "_blank"); }} 
+        className="w-full aspect-video bg-black/40 relative block overflow-hidden"
+      >
+        <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+      </button>
 
-                  <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-                    <span className="truncate pr-2">{file.title}</span>
-                    {isAdmin && <button onClick={() => deletefiles(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
-                  </div>
-                ))}
-                
-                <button 
-                  onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} 
-                  className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase"
-                >
-                  + Kart Ekle
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
+        <span className="truncate pr-2">{file.title}</span>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <button onClick={() => { setEditingfiles(file); setEditTitle(file.title); setEditMegaUrl(file.mega_url || ""); setEditListId(file.list_id); setShowEditModal(true); }} className="text-blue-500 hover:scale-110"><Edit3 size={14}/></button>
+            <button onClick={() => deletefiles(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>
+          </div>
+        )}
       </div>
+    </div> // Kapanması gereken div buydu
+  ))}
+
+<button 
+  onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} 
+  className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-[2rem] text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase flex items-center justify-center gap-2"
+>
+  <Plus size={14}/> Kart Ekle
+</button>
 
       {/* ── LİSTE DEĞİŞTİR ──────────────────────────────────────────────────── */}
       {showChangeCatModal && changeCatTarget && (
