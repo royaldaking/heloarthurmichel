@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   Plus, Trash2, X, Activity, Menu, ChevronLeft, ChevronUp, ChevronDown,
   LogOut, Lock, Mail, Tag, BarChart3, ShieldAlert, Edit3, ExternalLink, User,
-  Image as ImageIcon, MessageCircle, UserPlus, Send, Search, Clock, Settings,
+  ImageIcon, MessageCircle, UserPlus, Send, Search, Clock, Settings,
   Palette, Paintbrush, Eye, ChevronRight, ArrowLeftRight,
   Upload, Camera, RefreshCw, Dices
 } from "lucide-react";
@@ -84,7 +84,7 @@ export default function EmreBoard() {
   const [editId, setEditListId] = useState("");
 
   const [showChangeCatModal, setShowChangeCatModal] = useState(false);
-  const [changeCatTarget, setChangeCatTarget] = useState<files | null>(null);
+  const [changeCatTarget, setChangeCatTarget] = useState<any | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -113,7 +113,7 @@ export default function EmreBoard() {
   
   const [onlineUsers, setOnlineUsers] = useState<{ [key: string]: { online: boolean; last_seen: string } }>({});
   
-  const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
+  const [backgroundSettings, setBackgroundSettings] = useState<any>({
     type: 'solid', 
     solidColor: '#050505', 
     gradientStart: '#050505',
@@ -260,8 +260,8 @@ export default function EmreBoard() {
       return l;
     });
     setCategories([...updated].sort((a, b) => a.order_index - b.order_index));
-   await supabase.from("kategoriler").update({ order_index: tar.order_index }).eq("id", cur.id);
-   await supabase.from("kategoriler").update({ order_index: cur.order_index }).eq("id", tar.id);
+    await supabase.from("kategoriler").update({ order_index: tar.order_index }).eq("id", cur.id);
+    await supabase.from("kategoriler").update({ order_index: cur.order_index }).eq("id", tar.id);
   };
 
   // ── KART SIRALAMA — optimistik state ─────────────────────────────────────
@@ -273,7 +273,7 @@ export default function EmreBoard() {
     if (tIdx < 0 || tIdx >= listfiles.length) return;
     const cur = listfiles[index];
     const tar = listfiles[tIdx];
-    setfiles(prev => prev.map(c => {
+    setFiles(prev => prev.map(c => {
       if (c.id === cur.id) return { ...c, order_index: tar.order_index };
       if (c.id === tar.id) return { ...c, order_index: cur.order_index };
       return c;
@@ -424,12 +424,12 @@ const handleChangeList = async (newListId: string) => {
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
   };
 
-  // ── İSTATİSTİK — card_id üzerinden hesapla ───────────────────────────────
+ // ── İSTATİSTİK — card_id üzerinden hesapla ───────────────────────────────
   const getStats = () => {
     const m: { [k: string]: any } = {};
     logs.forEach(log => {
-      if (!log.files_id) return;
-      const id = log.files_id;
+      if (!log.file_id) return;
+      const id = log.file_id;
       if (!m[id]) m[id] = {
         id,
         title: log.title,
@@ -449,7 +449,7 @@ const handleChangeList = async (newListId: string) => {
 
   const deleteStatLogs = async (filesId: number | string) => {
     if (!isAdmin || !confirm("Sıfırlansın mı?")) return;
-    const { error } = await supabase.from("logs").update({ files_id: null }).eq("files_id", filesId);
+    const { error } = await supabase.from("logs").update({ file_id: null }).eq("file_id", filesId);
     if (!error) fetchAllData();
   };
 
@@ -481,45 +481,45 @@ const handleChangeList = async (newListId: string) => {
     if (matched) {
       setSearchedUserData({
         user: matched,
-        files: files.filter(c => logs.some(l => l.files_id === c.id && l.user_name === matched)),
+        files: files.filter(c => logs.some(l => l.file_id === c.id && l.user_name === matched)),
         logs: logs.filter(l => l.user_name === matched)
       });
     } else { setSearchedUserData(null); alert("Kullanıcı bulunamadı!"); }
   };
 
-  const startEditing = (files: files) => {
-    setEditingfiles(files);
-    setEditTitle(files.title);
-    setEditMegaUrl(files.mega_url);
+  const startEditing = (file: ArchiveItem) => {
+    setEditingFile(file);
+    setEditTitle(file.title);
+    setEditMegaUrl(file.mega_url);
     setEditFile(null);
-    setEditListId(files.category);
+    setEditListId(file.category);
     setShowEditModal(true);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingfiles) return;
+    if (!editingFile) return;
     setLoading(true);
     try {
-      let img = editingfiles.image_url;
+      let img = editingFile.image_url;
       if (editFile) {
         const fn = `files-${Date.now()}-${editFile.name.replace(/\s/g, '-')}`;
         await supabase.storage.from("arsiv-dosyalari").upload(fn, editFile);
         const { data: ud } = supabase.storage.from("arsiv-dosyalari").getPublicUrl(fn);
         img = ud.publicUrl;
       }
-      let oi = editingfiles.order_index;
-      if (editListId !== editingfiles.category) {
-        const lc = files.filter(c => c.category === editListId);
+      let oi = editingFile.order_index;
+      if (editId !== editingFile.category) {
+        const lc = files.filter(c => c.category === editId);
         oi = lc.length > 0 ? Math.max(...lc.map(c => c.order_index)) + 1 : 0;
       }
       await supabase.from("arsiv").update({
         title: editTitle.toUpperCase(),
         mega_url: editMegaUrl,
         image_url: img,
-        category: editListId,
+        category: editId,
         order_index: oi
-      }).eq("id", editingfiles.id);
+      }).eq("id", editingFile.id);
       setShowEditModal(false);
       fetchAllData();
     } catch (err: any) { alert(err.message); } finally { setLoading(false); }
@@ -545,19 +545,14 @@ const handleChangeList = async (newListId: string) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        if (!username.trim()) { alert("Kullanıcı adı gerekli!"); setAuthLoading(false); return; }
+        if (!email.trim()) { alert("E-posta gerekli!"); setAuthLoading(false); return; }
         const { error } = await supabase.auth.signUp({
           email, password,
-          options: { data: { display_name: username, avatar_url: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` } }
+          options: { data: { display_name: email.split('@')[0] } }
         });
         if (error) throw error;
-        if (avatarUrl || username) {
-          const np = { ...userProfiles, [username]: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}` };
-          setUserProfiles(np);
-          localStorage.setItem("emre_board_profiles", JSON.stringify(np));
-        }
         alert("Kayıt başarılı!");
-        setAuthMode('login'); setUsername(""); setAvatarUrl("");
+        setAuthMode('login');
       }
     } catch (err: any) { alert(err.message); } finally { setAuthLoading(false); }
   };
@@ -624,11 +619,11 @@ const handleChangeList = async (newListId: string) => {
   const getSortedListfiles = (listId: string) =>
     [...files.filter(c => c.category === listId)].sort((a, b) => a.order_index - b.order_index);
 
-  const saveBg = (s: BackgroundSettings) => {
+  const saveBg = (s: any) => {
     setBackgroundSettings(s);
     localStorage.setItem("emre_board_bg_settings", JSON.stringify(s));
   };
-
+  
   // ── GLOW CSS ──────────────────────────────────────────────────────────────
   const glowCSS = `
     @keyframes glowPulse {
@@ -787,69 +782,86 @@ const handleChangeList = async (newListId: string) => {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 custom-scrollbar-v flex flex-col">
-                {listfiles.map((files, idx) => (
+                {listfiles.map((file, idx) => (
                   <div
-                    id={`files-${files.id}`}
-                    key={files.id}
-                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === files.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
+                    id={`files-${file.id}`}
+                    key={file.id}
+                    className={`bg-[#0f0f11]/90 backdrop-blur-sm border rounded-[1.8rem] overflow-hidden relative group transition-all ${glowFilesId === file.id ? 'glow-files border-indigo-400' : 'border-white/5 hover:border-blue-600/40'}`}
                   >
-                  {isAdmin && <button onClick={() => startEditing(files)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
+                  {isAdmin && <button onClick={() => startEditing(file)} className="absolute top-3 right-3 z-30 bg-blue-600 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>}
+                  
+                  {/* Kart içeriği buraya gelecek (4. parça devamı veya 5. parça) */}
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetListId(list.id);
+                  setShowAddModal(true);
+                }}
+                className="mx-4 mb-4 p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase"
+              >
+                + Kart Ekle
+              </button>
+            </div>
+          );
+        })}
+      </div>
 
-{/* KART İÇERİĞİ SARMALAYICI BİTİŞİ */}
-             </div>
-
+      {/* ── LİSTE DEĞİŞTİR MODAL ─────────────────────────────────────────── */}
+      {showChangeCatModal && changeCatTarget && (
+        <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-zinc-900 border border-purple-600/30 p-8 rounded-[3rem] shadow-4xl">
+            <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3">
+              <ArrowLeftRight size={22} /> Liste Değiştir
+            </h2>
+            <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">
+              "{changeCatTarget.title}" kartını taşı
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
+              {categories.filter((l) => l.id !== changeCatTarget.category).map((list) => (
                 <button
-                  type="button"
-                  onClick={() => {
-                    setTargetListId(list.id);
-                    setShowAddModal(true);
-                  }}
+                  key={list.id}
+                  onClick={() => handleChangeList(list.id)}
+                  className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all"
+                >
+                  {list.title}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }}
+              className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase"
+            >
+              İptal
+            </button>
+          </div>
+        </div>
+      )}
+      
+{/* KART İÇERİĞİ: Resim ve Link */}
+                  <button 
+                    onClick={() => { if(file.mega_url) window.open(file.mega_url, "_blank"); }} 
+                    className="w-full aspect-video bg-black/40 relative block overflow-hidden"
+                  >
+                    <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+                  </button>
+
+                  <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
+                    <span className="truncate pr-2">{file.title}</span>
+                    {isAdmin && <button onClick={() => deletefiles(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
+                  </div>
+                ))}
+                
+                <button 
+                  onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} 
                   className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase"
                 >
                   + Kart Ekle
                 </button>
-        {/* ── LİSTE DEĞİŞTİR MODAL ─────────────────────────────────────────── */}
-        {showChangeCatModal && changeCatTarget && (
-          <div className="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
-            <div className="w-full max-w-sm bg-zinc-900 border border-purple-600/30 p-8 rounded-[3rem] shadow-4xl">
-              <h2 className="text-xl font-black italic uppercase mb-2 text-purple-400 flex items-center gap-3">
-                <ArrowLeftRight size={22} /> Liste Değiştir
-              </h2>
-              <p className="text-[10px] text-zinc-500 mb-6 font-bold uppercase">
-                "{changeCatTarget.title}" kartını taşı
-              </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar-v">
-                {categories.filter((l) => l.id !== changeCatTarget.category).map((list) => (
-                  <button
-                    key={list.id}
-                    onClick={() => handleChangeList(list.id)}
-                    className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left font-black text-xs uppercase hover:bg-purple-600/20 hover:border-purple-600/40 transition-all"
-                  >
-                    {list.title}
-                  </button>
-                ))}
               </div>
-              <button
-                onClick={() => { setShowChangeCatModal(false); setChangeCatTarget(null); }}
-                className="w-full mt-4 p-3 bg-white/5 rounded-2xl text-[10px] font-black uppercase"
-              >
-                İptal
-              </button>
             </div>
-          </div>
-        )}
-
-{/* BURASI DÜZELDİ: Linkin açılması için window.open eklendi */}
-<button onClick={() => { if(files.mega_url) window.open(files.mega_url, "_blank"); }} className="w-full aspect-video bg-black/40 relative block overflow-hidden">
-  <img src={files.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
-</button>
-
-<div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
-  <span className="truncate pr-2">{files.title}</span>
-  {isAdmin && <button onClick={() => deletefiles(files.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>}
-</div>
-                <button onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} className="w-full p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-xl text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase">+ Kart Ekle</button>
-              </div>
           );
         })}
       </div>
@@ -871,7 +883,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-{/* ── AKTİVİTE PANELİ (TEK VE TEMİZ BLOK) ─────────────────────────────────── */}
+      {/* ── AKTİVİTE PANELİ ─────────────────────────────────────────────────── */}
       {showActivityPanel && (
         <div className="fixed inset-0 z-[600] bg-[#050505] flex flex-col overflow-hidden">
           <div className="p-8 border-b border-white/5 flex flex-col gap-4 bg-zinc-900/50">
@@ -929,25 +941,6 @@ const handleChangeList = async (newListId: string) => {
                 </div>
               </div>
             )}
-
-            {/* KULLANICI LİSTESİ */}
-            {!selectedUser && !searchedUserData && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {getVisibleUsers().map(uName => (
-                  <div key={uName} className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 aspect-[4/3] flex flex-col items-center justify-center transition-all hover:border-blue-600/50 shadow-2xl">
-                    {userProfiles[uName] && <img src={userProfiles[uName]} className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50" alt=""/>}
-                    <User className="mb-4 text-blue-500 relative z-10" size={48}/>
-                    <button onClick={() => setSelectedUser(uName)} className="relative z-10 font-black uppercase italic text-lg tracking-wider hover:text-blue-400">{uName}</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div> 
-        </div>
-      )}
-      </div> // Ana kapsayıcı div
-  );
-}
 
             {/* ANA LİSTE: KULLANICI KARTLARI */}
             {!selectedUser && !searchedUserData && (
@@ -1077,8 +1070,11 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* ── STATS ───────────────────────────────────────────────────────────── */}
+     {/* ── STATS ───────────────────────────────────────────────────────────── */}
       {showStatsDetail && isAdmin && (
         <div className="fixed inset-0 z-[900] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-4xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col h-[85vh]">
@@ -1287,11 +1283,11 @@ const handleChangeList = async (newListId: string) => {
                   </button>
                   <div>
                     <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span className="flex items-center gap-1"><Eye size={12}/> Bulanıklık</span><span className="text-cyan-500">{backgroundSettings.blur}px</span></label>
-                    <input type="range" min="0" max="30" value={backgroundSettings.blur} onChange={e => saveBg({ ...backgroundSettings, blur: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
+                    <input type="range" min="0" max="30" value={backgroundSettings.blur} onChange={e => saveBg({ ...backgroundSettings, blur: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-cyan-500"/>
                   </div>
                   <div>
                     <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span>Koyuluk</span><span className="text-cyan-500">{backgroundSettings.opacity}%</span></label>
-                    <input type="range" min="0" max="100" value={backgroundSettings.opacity} onChange={e => saveBg({ ...backgroundSettings, opacity: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
+                    <input type="range" min="0" max="100" value={backgroundSettings.opacity} onChange={e => saveBg({ ...backgroundSettings, opacity: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-cyan-500"/>
                   </div>
                   {backgroundSettings.imageUrl && (
                     <div className="relative h-32 rounded-xl border border-white/10 overflow-hidden">
@@ -1364,16 +1360,18 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-      {/* ŞANSLI KART MODAL */}
+      {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
       {randomFiles && (
         <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
-            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4"><img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" /></div>
+            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4">
+              <img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" />
+            </div>
             <div className="text-center pb-6">
               <h2 className="text-3xl font-black italic uppercase mb-8">{randomFiles.title}</h2>
               <div className="flex gap-4 px-6">
-                <button onClick={() => setRandomFiles(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
-                <button onClick={() => handlefilesClick(randomFiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
+                <button type="button" onClick={() => setRandomFiles(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
+                <button type="button" onClick={() => handlefilesClick(randomFiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
               </div>
             </div>
           </div>
