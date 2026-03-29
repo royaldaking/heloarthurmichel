@@ -1361,6 +1361,10 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
+     return (
+    <div className="min-h-screen bg-black text-white p-4 md:p-8">
+      {/* Buraya kategoriler ve diğer içeriklerin olduğu ana div'lerin geldiğini varsayıyoruz */}
+
       {/* ── SİSTEM LOGLARI ──────────────────────────────────────────────────── */}
       {showSystemLogs && isAdmin && (
         <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
@@ -1406,7 +1410,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-  {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
+      {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
       {randomFiles && (
         <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
@@ -1423,6 +1427,6 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-    </div> 
+    </div>
   );
 }
