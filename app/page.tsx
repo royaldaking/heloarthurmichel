@@ -1115,7 +1115,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-      {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
+     {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
       {showEditModal && editingfiles && (
         <div className="fixed inset-0 z-[1100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-lg bg-zinc-900 border border-blue-600/30 p-8 rounded-[3rem] shadow-4xl">
@@ -1155,7 +1155,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
-      {/* ── KART EKLEME ─────────────────────────────────────────────────────── */}
+      {/* ── KART EKLEME MODAL ────────────────────────────────────────────────── */}
       {showAddModal && (
         <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-lg bg-zinc-900 border border-white/10 p-8 rounded-[3rem]">
@@ -1182,6 +1182,47 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
+
+      {/* ── KATEGORİLER VE KARTLARIN DÖNDÜĞÜ YER ─────────────────────────────── */}
+      <div className="space-y-12">
+        {categories.map((list) => (
+          <div key={list.id} className="space-y-6">
+            <div className="flex items-center gap-4 border-l-4 border-blue-600 pl-4">
+              <h2 className="text-xl font-black uppercase italic">{list.title}</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {files
+                .filter((f) => f.list_id === list.id)
+                .map((file) => (
+                  <div key={file.id} className="group bg-zinc-900/40 border border-white/5 rounded-[2rem] overflow-hidden hover:border-blue-500/30 transition-all">
+                    <button 
+                      onClick={() => { if(file.mega_url) window.open(file.mega_url, "_blank"); }} 
+                      className="w-full aspect-video bg-black/40 relative block overflow-hidden"
+                    >
+                      <img src={file.image_url} className="w-full h-full object-contain p-2 hover:scale-110 transition-transform duration-700" alt=""/>
+                    </button>
+
+                    <div className="p-3 md:p-4 flex justify-between items-center font-black text-[9px] md:text-xs uppercase italic text-zinc-200">
+                      <span className="truncate pr-2">{file.title}</span>
+                      {isAdmin && (
+                        <button onClick={() => deletefiles(file.id)} className="text-red-500 hover:scale-110"><Trash2 size={14}/></button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+              <button 
+                onClick={() => { setTargetListId(list.id); setShowAddModal(true); }} 
+                className="w-full aspect-video p-4 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-[2rem] text-[10px] font-black text-zinc-600 hover:text-blue-500 transition-all uppercase flex flex-col items-center justify-center gap-2"
+              >
+                <Plus size={20}/>
+                Kart Ekle
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* ── AYARLAR ─────────────────────────────────────────────────────────── */}
       {showSettingsPanel && (
