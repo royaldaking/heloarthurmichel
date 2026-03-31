@@ -1362,71 +1362,108 @@ const handleChangeList = async (newListId: string) => {
       )}
 
      return (
-    <div className="min-h-screen bg-black text-white p-4 md:p-8">
-      {/* Buraya kategoriler ve diğer içeriklerin olduğu ana div'lerin geldiğini varsayıyoruz */}
+        <div className="min-h-screen bg-black text-white p-4 md:p-8">
+            {/* Buraya kategoriler ve diğer içeriklerin olduğu ana div'lerin geldiğini varsayıyoruz */}
 
-      {/* ── SİSTEM LOGLARI ──────────────────────────────────────────────────── */}
-      {showSystemLogs && isAdmin && (
-        <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
-          <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-orange-600/10 to-transparent">
-            <h2 className="text-2xl font-black uppercase italic text-orange-500 flex items-center gap-3"><ShieldAlert size={28}/> Sistem Logları</h2>
-            <button onClick={() => setShowSystemLogs(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar-v">
-            <div className="max-w-6xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {[
-                  { val: logs.length, label: 'Toplam Log', color: 'text-blue-500' },
-                  { val: getVisibleUsers().length, label: 'Kullanıcı', color: 'text-green-500' },
-                  { val: files.length, label: 'Kart', color: 'text-purple-500' },
-                  { val: categories.length, label: 'Liste', color: 'text-orange-500' }
-                ].map(({ val, label, color }) => (
-                  <div key={label} className="bg-zinc-900/60 border border-white/10 rounded-2xl p-6 text-center">
-                    <p className={`text-4xl font-black ${color}`}>{val}</p>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase mt-1">{label}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] overflow-hidden">
-                <div className="p-6 border-b border-white/5"><h3 className="font-black uppercase italic text-sm">Tüm Tıklama Geçmişi</h3></div>
-                <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto custom-scrollbar-v">
-                  {logs.map(log => (
-                    <div key={log.id} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-all">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/40 shrink-0 p-1"><img src={log.image_url} className="w-full h-full object-contain" alt=""/></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-black italic uppercase text-sm truncate">{log.title}</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-[9px] font-bold text-blue-400 bg-blue-600/20 px-2 py-0.5 rounded-full">{log.user_name || 'Anonim'}</span>
-                          <span className="text-[9px] font-bold text-zinc-500">{new Date(log.created_at).toLocaleString('tr-TR')}</span>
-                          {log.files_id && <span className="text-[9px] font-bold text-zinc-600">ID:{log.files_id}</span>}
-                        </div>
-                      </div>
+            {/* ── SİSTEM LOGLARI ──────────────────────────────────────────────────── */}
+            {showSystemLogs && isAdmin && (
+                <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
+                    <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-orange-600/10 to-transparent">
+                        <h2 className="text-2xl font-black uppercase italic text-orange-500 flex items-center gap-3">
+                            <ShieldAlert size={28} /> Sistem Logları
+                        </h2>
+                        <button 
+                            onClick={() => setShowSystemLogs(false)} 
+                            className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"
+                        >
+                            <X size={24} />
+                        </button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+                    
+                    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar-v">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                                {[
+                                    { val: logs.length, label: 'Toplam Log', color: 'text-blue-500' },
+                                    { val: getVisibleUsers().length, label: 'Kullanıcı', color: 'text-green-500' },
+                                    { val: files.length, label: 'Kart', color: 'text-purple-500' },
+                                    { val: categories.length, label: 'Liste', color: 'text-orange-500' }
+                                ].map(({ val, label, color }) => (
+                                    <div key={label} className="bg-zinc-900/60 border border-white/10 rounded-2xl p-6 text-center">
+                                        <p className={`text-4xl font-black ${color}`}>{val}</p>
+                                        <p className="text-[10px] font-bold text-zinc-500 uppercase mt-1">{label}</p>
+                                    </div>
+                                ))}
+                            </div>
 
-      {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
-      {randomFiles && (
-        <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
-          <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
-            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4">
-              <img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" />
-            </div>
-            <div className="text-center pb-6">
-              <h2 className="text-3xl font-black italic uppercase mb-8">{randomFiles.title}</h2>
-              <div className="flex gap-4 px-6">
-                <button type="button" onClick={() => setRandomFiles(null)} className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase">KAPAT</button>
-                <button type="button" onClick={() => handlefilesClick(randomFiles)} className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center">GİT</button>
-              </div>
-            </div>
-          </div>
+                            <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] overflow-hidden">
+                                <div className="p-6 border-b border-white/5">
+                                    <h3 className="font-black uppercase italic text-sm">Tüm Tıklama Geçmişi</h3>
+                                </div>
+                                <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto custom-scrollbar-v">
+                                    {logs.map(log => (
+                                        <div key={log.id} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-all">
+                                            <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/40 shrink-0 p-1">
+                                                <img src={log.image_url} className="w-full h-full object-contain" alt="" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-black italic uppercase text-sm truncate">{log.title}</p>
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <span className="text-[9px] font-bold text-blue-400 bg-blue-600/20 px-2 py-0.5 rounded-full">
+                                                        {log.user_name || 'Anonim'}
+                                                    </span>
+                                                    <span className="text-[9px] font-bold text-zinc-500">
+                                                        {new Date(log.created_at).toLocaleString('tr-TR')}
+                                                    </span>
+                                                    {log.files_id && (
+                                                        <span className="text-[9px] font-bold text-zinc-600">ID:{log.files_id}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── ŞANSLI KART MODAL ───────────────────────────────────────────────── */}
+            {randomFiles && (
+                <div 
+                    className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" 
+                    onClick={() => setRandomFiles(null)}
+                >
+                    <div 
+                        className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" 
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4">
+                            <img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" />
+                        </div>
+                        <div className="text-center pb-6">
+                            <h2 className="text-3xl font-black italic uppercase mb-8">{randomFiles.title}</h2>
+                            <div className="flex gap-4 px-6">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setRandomFiles(null)} 
+                                    className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase"
+                                >
+                                    KAPAT
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handlefilesClick(randomFiles)} 
+                                    className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center"
+                                >
+                                    GİT
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 }
