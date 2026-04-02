@@ -1359,7 +1359,6 @@ const handleChangeList = async (newListId: string) => {
             </div>
           </div>
         </div>
-      )}
 
      return (
         <div className="min-h-screen bg-black text-white p-4 md:p-8">
