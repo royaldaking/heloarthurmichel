@@ -13,6 +13,7 @@ const supabaseUrl = "https://wobnwchodzgsofpybztg.supabase.co";
 const supabaseKey = "sb_publishable_JgD3W7_LA5OLvE_j2GzgSw_4vBaKN7N";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 interface Category { 
   id: string; 
@@ -105,7 +106,8 @@ export default function EmreBoard() {
 
   const [isAdmin, setIsAdmin] = useState(false);
   const ADMIN_NAME = "Emre";
-
+  
+  const [showStatsDetail, setShowStatsDetail] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showSystemLogs, setShowSystemLogs] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
