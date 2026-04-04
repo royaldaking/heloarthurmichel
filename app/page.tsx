@@ -1447,12 +1447,12 @@ const handleChangeList = async (newListId: string) => {
                    className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center"
                  >
 GİT
-                </button>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
 };
