@@ -1360,6 +1360,9 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
+</div>
+  );
+}
 
     // BURADAN İTİBAREN ANA GÖRÜNÜM BAŞLIYOR 
    return (
