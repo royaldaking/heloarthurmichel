@@ -1425,32 +1425,27 @@ const handleChangeList = async (newListId: string) => {
          </div>
        )}
 
-       {/* Şanslı Kart Bölümü */}
-       {randomFiles && (
-         <div 
-           className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" 
-           onClick={() => setRandomFiles(null)}
-         >
-           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
-             <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4">
-               <img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" />
-             </div>
-             <div className="text-center pb-6">
-               <h2 className="text-3xl font-black italic uppercase mb-8">{randomFiles.title}</h2>
-               <div className="flex gap-4 px-6">
-                 <button 
-                   type="button" 
-                   onClick={() => setRandomFiles(null)} 
-                   className="flex-1 p-4 bg-white/5 rounded-2xl font-black text-xs uppercase"
-                 >
-                   KAPAT
-                 </button>
-                 <button 
-                   type="button" 
-                   onClick={() => handlefilesClick(randomFiles)} 
-                   className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center"
-                 >
->
+      {/* ── ŞANSLI RASTGELE KART MODELİ ─────────────────────────────────────── */}
+      {randomFiles && (
+        <div className="fixed inset-0 z-[850] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
+          <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem] shadow-[0_0_50px_rgba(37,99,235,0.2)]" onClick={e => e.stopPropagation()}>
+            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4 relative group">
+              <img src={randomFiles.image_url} className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110" alt="" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            </div>
+            <div className="text-center pb-6">
+              <h2 className="text-3xl font-black italic uppercase mb-8 tracking-tighter">{randomFiles.title}</h2>
+              <div className="flex gap-4 px-6">
+                <button 
+                  onClick={() => setRandomFiles(null)} 
+                  className="flex-1 p-5 bg-white/5 hover:bg-white/10 rounded-2xl font-black text-[10px] uppercase transition-all"
+                >
+                  KAPAT
+                </button>
+                <button 
+                  onClick={() => handlefilesClick(randomFiles)} 
+                  className="flex-1 p-5 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-[10px] uppercase transition-all shadow-[0_10px_20px_rgba(37,99,235,0.3)]"
+                >
                   GİT
                 </button>
               </div>
@@ -1458,7 +1453,6 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-
     </div>
   );
 }
