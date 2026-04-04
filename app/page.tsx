@@ -1187,7 +1187,7 @@ const handleChangeList = async (newListId: string) => {
 
     </div>
   );
-     {/* ── KATEGORİLER VE KARTLARIN DÖNDÜĞÜ YER ─────────────────────────────── */}
+      {/* ── KATEGORİLER VE KARTLARIN DÖNDÜĞÜ YER ─────────────────────────────── */}
       <div className="space-y-12">
         {categories.map((list) => (
           <div key={list.id} className="space-y-6">
@@ -1228,7 +1228,7 @@ const handleChangeList = async (newListId: string) => {
         ))}
       </div>
 
-      {/* ── AYARLAR ─────────────────────────────────────────────────────────── */}
+{/* ── AYARLAR ─────────────────────────────────────────────────────────── */}
       {showSettingsPanel && (
         <div className="fixed inset-0 z-[750] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col max-h-[90vh] shadow-4xl">
@@ -1289,6 +1289,11 @@ const handleChangeList = async (newListId: string) => {
                     <input type="color" value={backgroundSettings.solidColor} onChange={e => saveBg({ ...backgroundSettings, solidColor: e.target.value })} className="w-16 h-16 rounded-2xl border-2 border-white/10 cursor-pointer bg-transparent"/>
                     <input type="text" value={backgroundSettings.solidColor} onChange={e => saveBg({ ...backgroundSettings, solidColor: e.target.value })} className="flex-1 bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 uppercase"/>
                   </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {['#050505','#0a0a0f','#0f172a','#1a1a2e','#16213e','#1f1f1f','#2d132c','#0f0f23'].map(c => (
+                      <button key={c} onClick={() => saveBg({ ...backgroundSettings, solidColor: c })} className="w-10 h-10 rounded-xl border-2 border-white/10 hover:border-cyan-500 transition-all" style={{ backgroundColor: c }}/>
+                    ))}
+                  </div>
                 </div>
               )}
               {backgroundSettings.type === 'gradient' && (
@@ -1305,6 +1310,15 @@ const handleChangeList = async (newListId: string) => {
                       </div>
                     ))}
                   </div>
+                  <select value={backgroundSettings.gradientDirection} onChange={e => saveBg({ ...backgroundSettings, gradientDirection: e.target.value })} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-bold outline-none focus:border-cyan-600 text-white">
+                    <option value="to bottom">Yukarıdan Aşağı</option>
+                    <option value="to top">Aşağıdan Yukarı</option>
+                    <option value="to right">Soldan Sağa</option>
+                    <option value="to left">Sağdan Sola</option>
+                    <option value="to bottom right">Köşegen (Sağ Alt)</option>
+                    <option value="to bottom left">Köşegen (Sol Alt)</option>
+                  </select>
+                  <div className="h-20 rounded-xl border border-white/10" style={{ background: `linear-gradient(${backgroundSettings.gradientDirection},${backgroundSettings.gradientStart},${backgroundSettings.gradientEnd})` }}/>
                 </div>
               )}
               {backgroundSettings.type === 'image' && (
@@ -1315,34 +1329,103 @@ const handleChangeList = async (newListId: string) => {
                     className="w-full p-6 bg-white/[0.02] border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center gap-3 hover:bg-cyan-600/5 hover:border-cyan-600/30 transition-all disabled:opacity-50">
                     {bgUploading ? <RefreshCw size={32} className="text-cyan-500 animate-spin"/> : <Upload size={32} className="text-cyan-500"/>}
                     <p className="text-xs font-black uppercase text-zinc-400">{bgUploading ? "Yükleniyor..." : "Dosya Seç"}</p>
+                    <p className="text-[9px] text-zinc-600">PNG, JPG, GIF, WEBP • cover + fixed + center</p>
                   </button>
+                  <div>
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span className="flex items-center gap-1"><Eye size={12}/> Bulanıklık</span><span className="text-cyan-500">{backgroundSettings.blur}px</span></label>
+                    <input type="range" min="0" max="30" value={backgroundSettings.blur} onChange={e => saveBg({ ...backgroundSettings, blur: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-cyan-500"/>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold text-zinc-500 uppercase mb-2 flex items-center justify-between"><span>Koyuluk</span><span className="text-cyan-500">{backgroundSettings.opacity}%</span></label>
+                    <input type="range" min="0" max="100" value={backgroundSettings.opacity} onChange={e => saveBg({ ...backgroundSettings, opacity: parseInt(e.target.value) })} className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-cyan-500"/>
+                  </div>
+                  {backgroundSettings.imageUrl && (
+                    <div className="relative h-32 rounded-xl border border-white/10 overflow-hidden">
+                      <div className="absolute inset-0" style={{ backgroundImage: `url(${backgroundSettings.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: backgroundSettings.blur > 0 ? `blur(${backgroundSettings.blur}px)` : 'none' }}/>
+                      <div className="absolute inset-0" style={{ backgroundColor: `rgba(0,0,0,${backgroundSettings.opacity / 100})` }}/>
+                      <p className="absolute inset-0 flex items-center justify-center text-xs font-black uppercase text-white/80 z-10">Önizleme</p>
+                    </div>
+                  )}
                 </div>
               )}
-              <button onClick={() => saveBg({ type: 'solid', solidColor: '#050505' })}
+              <button onClick={() => saveBg({ type: 'solid', solidColor: '#050505', gradientStart: '#050505', gradientEnd: '#1a1a2e', gradientDirection: 'to bottom right', imageUrl: '', blur: 0, opacity: 50 })}
                 className="w-full p-4 bg-red-600/10 text-red-500 rounded-2xl font-black uppercase text-[10px] border border-red-600/20 hover:bg-red-600/20 transition-all">
                 Varsayılana Sıfırla
               </button>
+              {isAdmin && (
+                <div className="border-t border-white/5 pt-6">
+                  <h3 className="text-sm font-black uppercase italic text-orange-400 mb-4 flex items-center gap-2"><ShieldAlert size={16}/> Admin Paneli</h3>
+                  <button onClick={() => { setShowSettingsPanel(false); setShowSystemLogs(true); }} className="w-full p-4 bg-orange-600/10 text-orange-500 rounded-2xl font-black uppercase text-[10px] border border-orange-600/20 hover:bg-orange-600/20 transition-all flex items-center justify-center gap-2">
+                    <Activity size={16}/> Sistem Loglarını Gör
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
+       {/* Sistem Logları Bölümü */}
+       {showSystemLogs && isAdmin && (
+         <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
+           <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-orange-600/10 to-transparent">
+             <h2 className="text-2xl font-black uppercase italic text-orange-500 flex items-center gap-3">
+               <ShieldAlert size={28} /> Sistem Logları
+             </h2>
+             <button 
+               onClick={() => setShowSystemLogs(false)} 
+               className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"
+             >
+               <X size={24} />
+             </button>
+           </div>
+           
+           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar-v">
+             <div className="max-w-6xl mx-auto">
+               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                 {[
+                   { val: logs.length, label: 'Toplam Log', color: 'text-blue-500' },
+                   { val: getVisibleUsers().length, label: 'Kullanıcı', color: 'text-green-500' },
+                   { val: files.length, label: 'Kart', color: 'text-purple-500' },
+                   { val: categories.length, label: 'Liste', color: 'text-orange-500' }
+                 ].map(({ val, label, color }) => (
+                   <div key={label} className="bg-zinc-900/60 border border-white/10 rounded-2xl p-6 text-center">
+                     <p className={`text-4xl font-black ${color}`}>{val}</p>
+                     <p className="text-[10px] font-bold text-zinc-500 uppercase mt-1">{label}</p>
+                   </div>
+                 ))}
+               </div>
 
-      {/* Sistem Logları Bölümü */}
-      {showSystemLogs && isAdmin && (
-        <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
-          <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-orange-600/10 to-transparent">
-            <h2 className="text-2xl font-black uppercase italic text-orange-500 flex items-center gap-3"><ShieldAlert size={28} /> Sistem Logları</h2>
-            <button onClick={() => setShowSystemLogs(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24} /></button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar-v">
-            <div className="max-w-6xl mx-auto">
-               {/* Log İçeriği Buraya */}
-            </div>
-          </div>
-        </div>
-      )}
+               <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] overflow-hidden">
+                 <div className="p-6 border-b border-white/5">
+                   <h3 className="font-black uppercase italic text-sm">Tüm Tıklama Geçmişi</h3>
+                 </div>
+                 <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto custom-scrollbar-v">
+                   {logs.map(log => (
+                     <div key={log.id} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-all">
+                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/40 shrink-0 p-1">
+                         <img src={log.image_url} className="w-full h-full object-contain" alt="" />
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <p className="font-black italic uppercase text-sm truncate">{log.title}</p>
+                         <div className="flex items-center gap-3 mt-1">
+                           <span className="text-[9px] font-bold text-blue-400 bg-blue-600/20 px-2 py-0.5 rounded-full">
+                             {log.user_name || 'Anonim'}
+                           </span>
+                           <span className="text-[9px] font-bold text-zinc-500">
+                             {new Date(log.created_at).toLocaleString('tr-TR')}
+                           </span>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
 
-      {/* ŞANSLI KART MODAL */}
+{/* ŞANSLI KART MODAL */}
       {randomFiles && (
         <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
@@ -1359,7 +1442,8 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-
+ </div>
+      )}
     </div>
   );
 }
