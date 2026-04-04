@@ -1360,9 +1360,6 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-
-   return (
-     <div className="min-h-screen bg-black text-white p-4 md:p-8">
        {/* Sistem Logları Bölümü */}
        {showSystemLogs && isAdmin && (
          <div className="fixed inset-0 z-[950] bg-black/98 backdrop-blur-2xl flex flex-col overflow-hidden">
