@@ -1446,13 +1446,13 @@ const handleChangeList = async (newListId: string) => {
                    onClick={() => handlefilesClick(randomFiles)} 
                    className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center"
                  >
-              GİT
-                  </button>
-                </div>
+GİT
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div> {/* <--- BU SATIR EKSİKTİ, EKLEDİM (Ana min-h-screen div'ini kapatır) */}
-    );
-}; // Component/Fonksiyon kapanışı
+        </div>
+      )}
+    </div>
+  );
+};
