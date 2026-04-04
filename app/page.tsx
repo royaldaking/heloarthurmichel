@@ -1425,11 +1425,13 @@ const handleChangeList = async (newListId: string) => {
          </div>
        )}
 
-       {/* ŞANSLI KART MODAL */}
+{/* ŞANSLI KART MODAL */}
       {randomFiles && (
         <div className="fixed inset-0 z-[800] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setRandomFiles(null)}>
           <div className="w-full max-w-xl bg-zinc-900 border border-blue-600/30 p-4 rounded-[3rem]" onClick={e => e.stopPropagation()}>
-            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4"><img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" /></div>
+            <div className="aspect-video mb-6 rounded-[2rem] overflow-hidden bg-black/40 p-4">
+              <img src={randomFiles.image_url} className="w-full h-full object-contain" alt="" />
+            </div>
             <div className="text-center pb-6">
               <h2 className="text-3xl font-black italic uppercase mb-8">{randomFiles.title}</h2>
               <div className="flex gap-4 px-6">
@@ -1440,5 +1442,6 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
+    </div>
   );
 }
