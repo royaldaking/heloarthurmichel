@@ -1077,10 +1077,7 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
     </div>
-  );
-}
-
-     {/* ── STATS ───────────────────────────────────────────────────────────── */}
+      {/* ── STATS ───────────────────────────────────────────────────────────── */}
       {showStatsDetail && isAdmin && (
         <div className="fixed inset-0 z-[900] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
           <div className="w-full max-w-4xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col h-[85vh]">
@@ -1115,7 +1112,6 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-
      {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
       {showEditModal && editingfiles && (
         <div className="fixed inset-0 z-[1100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
@@ -1155,6 +1151,9 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
+    );
+}
+
 
       {/* ── KART EKLEME MODAL ────────────────────────────────────────────────── */}
       {showAddModal && (
