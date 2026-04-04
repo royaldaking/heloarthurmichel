@@ -1187,7 +1187,6 @@ const handleChangeList = async (newListId: string) => {
 
     </div>
   );
-}
       {/* ── KATEGORİLER VE KARTLARIN DÖNDÜĞÜ YER ─────────────────────────────── */}
       <div className="space-y-12">
         {categories.map((list) => (
