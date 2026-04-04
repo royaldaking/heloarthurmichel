@@ -76,7 +76,6 @@ export default function EmreBoard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
-  const [showStatsDetail, setShowStatsDetail] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [editingFile, setEditingFile] = useState<ArchiveItem | null>(null);
   const [editTitle, setEditTitle] = useState("");
