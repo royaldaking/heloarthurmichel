@@ -1440,6 +1440,5 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-    </div>
   );
 }
