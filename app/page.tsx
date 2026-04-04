@@ -1451,12 +1451,13 @@ const handleChangeList = async (newListId: string) => {
                    className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center"
                  >
 GİT
-                  </button>
-                </div>
+                </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
- </div>
+    </div> {/* İŞTE EKSİK OLAN VE HATAYA SEBEP OLAN ANA DIV BURASI */}
+  );
 }
