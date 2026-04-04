@@ -1450,7 +1450,8 @@ const handleChangeList = async (newListId: string) => {
                    onClick={() => handlefilesClick(randomFiles)} 
                    className="flex-1 p-4 bg-blue-600 rounded-2xl font-black text-xs uppercase text-center"
                  >
-GİT
+>
+                  GİT
                 </button>
               </div>
             </div>
@@ -1458,6 +1459,6 @@ GİT
         </div>
       )}
 
-    </div> {/* İŞTE EKSİK OLAN VE HATAYA SEBEP OLAN ANA DIV BURASI */}
+    </div>
   );
 }
