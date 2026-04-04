@@ -1061,22 +1061,19 @@ const handleChangeList = async (newListId: string) => {
               )}
             </div>
             {showAddFriendModal && (
-              <div className="absolute inset-0 z-[800] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-                <div className="w-full max-w-sm bg-zinc-900 border border-white/10 p-8 rounded-[2rem] text-center">
-                  <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadaş Ara</h3>
-                  <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTİF KULLANICILAR EKLENEBİLİR</p>
-                  <input type="text" value={searchFriendName} onChange={e => setSearchFriendName(e.target.value)} placeholder="Tam kullanıcı adı..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6"/>
-                  <div className="flex gap-4">
-                    <button onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
-                    <button onClick={handleAddFriend} className="flex-1 p-3 bg-blue-600 rounded-xl text-[10px] font-black uppercase">Ekle</button>
-                  </div>
-                </div>
-              </div>
-            )}
+        <div className="absolute inset-0 z-[800] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-zinc-900 border border-white/10 p-8 rounded-[2rem] text-center">
+            <h3 className="text-xl font-black uppercase italic text-blue-500 mb-6 flex items-center justify-center gap-3"><Search/> Arkadaş Ara</h3>
+            <p className="text-[9px] text-zinc-500 mb-4 font-bold">SADECE KAYITLI VE AKTİF KULLANICILAR EKLENEBİLİR</p>
+            <input type="text" value={searchFriendName} onChange={e => setSearchFriendName(e.target.value)} placeholder="Tam kullanıcı adı..." className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-bold outline-none focus:border-blue-600 mb-6"/>
+            <div className="flex gap-4">
+              <button onClick={() => setShowAddFriendModal(false)} className="flex-1 p-3 bg-white/5 rounded-xl text-[10px] font-black uppercase">İptal</button>
+              <button onClick={handleAddFriend} className="flex-1 p-3 bg-blue-600 rounded-xl text-[10px] font-black uppercase">Ekle</button>
+            </div>
           </div>
         </div>
       )}
-    </div>
+
       {/* ── STATS ───────────────────────────────────────────────────────────── */}
       {showStatsDetail && isAdmin && (
         <div className="fixed inset-0 z-[900] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
@@ -1086,14 +1083,21 @@ const handleChangeList = async (newListId: string) => {
               <button onClick={() => setShowStatsDetail(false)} className="p-3 bg-red-600/10 text-red-500 rounded-2xl hover:bg-red-600 transition-all"><X size={24}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar-v">
-              {getStats().map((stat: any, idx) => (
+              {getStats().map((stat: any, idx: number) => (
                 <div key={idx} className="bg-zinc-900/40 border border-white/5 rounded-[2rem] p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl overflow-hidden bg-black/40 p-2"><img src={stat.image_url} className="w-full h-full object-contain" alt=""/></div>
-                      <div><h3 className="font-black italic uppercase text-lg">{stat.title}</h3><p className="text-blue-500 font-bold text-xs uppercase">{stat.totalClicks} TOPLAM TIKLANMA</p></div>
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden bg-black/40 p-2">
+                        <img src={stat.image_url} className="w-full h-full object-contain" alt=""/>
+                      </div>
+                      <div>
+                        <h3 className="font-black italic uppercase text-lg">{stat.title}</h3>
+                        <p className="text-blue-500 font-bold text-xs uppercase">{stat.totalClicks} TOPLAM TIKLANMA</p>
+                      </div>
                     </div>
-                    <a href={stat.mega_url} target="_blank" rel="noreferrer" className="p-4 bg-blue-600/10 text-blue-500 rounded-2xl hover:bg-blue-600 transition-all flex items-center gap-2 font-black text-[10px] uppercase"><ExternalLink size={16}/> Git</a>
+                    <a href={stat.mega_url} target="_blank" rel="noreferrer" className="p-4 bg-blue-600/10 text-blue-500 rounded-2xl hover:bg-blue-600 transition-all flex items-center gap-2 font-black text-[10px] uppercase">
+                      <ExternalLink size={16}/> Git
+                    </a>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {Object.entries(stat.users).map(([uName, data]: any) => (
@@ -1112,7 +1116,8 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-     {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
+
+      {/* ── DÜZENLEME MODAL ─────────────────────────────────────────────────── */}
       {showEditModal && editingfiles && (
         <div className="fixed inset-0 z-[1100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
           <div className="w-full max-w-lg bg-zinc-900 border border-blue-600/30 p-8 rounded-[3rem] shadow-4xl">
@@ -1151,9 +1156,6 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-    );
-}
-
 
       {/* ── KART EKLEME MODAL ────────────────────────────────────────────────── */}
       {showAddModal && (
@@ -1183,6 +1185,9 @@ const handleChangeList = async (newListId: string) => {
         </div>
       )}
 
+    </div>
+  );
+}
       {/* ── KATEGORİLER VE KARTLARIN DÖNDÜĞÜ YER ─────────────────────────────── */}
       <div className="space-y-12">
         {categories.map((list) => (
