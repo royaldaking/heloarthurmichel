@@ -1442,6 +1442,9 @@ const handleChangeList = async (newListId: string) => {
           </div>
         </div>
       )}
-    </div>
-  );
+   </div>
+      )}
+    </div> {/* Mevcut olan */}
+  </div> {/* BU EKSİK OLAN VE HATAYA SEBEP OLAN YENİ EKLEDİĞİMİZ */}
+);
 }
